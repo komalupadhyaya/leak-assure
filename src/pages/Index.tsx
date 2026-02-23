@@ -31,7 +31,7 @@ const Index = () => {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("http://localhost:5000/api/checkout/create-session", {
+      const res = await fetch("https://leak-assure.onrender.com/api/checkout/create-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
