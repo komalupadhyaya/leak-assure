@@ -34,7 +34,7 @@ const Admin = () => {
   // Initial fetch won't run until authorized to save resources/security
   const fetchCustomers = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/customers");
+      const res = await fetch("https://leak-assure.onrender.com/api/admin/customers");
       const data = await res.json();
       setCustomers(data);
     } catch {
