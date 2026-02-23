@@ -18,7 +18,7 @@ const Success = () => {
     const verifySession = async () => {
       try {
         console.log("Verifying session ID:", sessionId);
-        const res = await fetch(`http://localhost:5000/api/checkout/verify-session?session_id=${sessionId}`);
+        const res = await fetch(`https://leak-assure.onrender.com/api/checkout/verify-session?session_id=${sessionId}`);
         const data = await res.json();
 
         if (data.success) {
