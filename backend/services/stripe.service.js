@@ -17,8 +17,8 @@ const createCheckoutSession = async (customerData, priceId) => {
             },
         ],
         // Correct URL construction with port 5173 (Vite default)
-        success_url: `http://localhost:8080/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `http://localhost:8080/cancel`, // Using /cancel to show message
+        success_url: `https://leak-assure-kksy.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://leak-assure-kksy.vercel.app/cancel`, // Using /cancel to show message
     });
 
     return session;
