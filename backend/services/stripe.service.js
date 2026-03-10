@@ -16,9 +16,9 @@ const createCheckoutSession = async (customerData, priceId) => {
                 quantity: 1,
             },
         ],
-        // Correct URL construction with port 5173 (Vite default)
-        success_url: `https://leak-assure-kksy.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `https://leak-assure-kksy.vercel.app/cancel`, // Using /cancel to show message
+        // Correct URL construction with environment variables
+        success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL}/cancel`, // Using /cancel to show message
     });
 
     return session;
