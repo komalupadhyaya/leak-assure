@@ -83,21 +83,21 @@ const Dashboard = () => {
                     </div>
 
                     {/* Plan Details Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-slate-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 border-t md:border-t-0 border-slate-100">
                         <div className="p-5">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Monthly Cost</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monthly Cost</p>
                             <p className="text-xl font-bold text-slate-900">${profile.planPrice || (isPremium ? 49 : 29)}</p>
                         </div>
-                        <div className="p-5">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Incident Limit</p>
+                        <div className="p-5 sm:border-l sm:border-slate-100 md:border-l-0">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Incident Limit</p>
                             <p className="text-xl font-bold text-slate-900">{planDetails.incidentLimit}</p>
                         </div>
                         <div className="p-5">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Claims Per Year</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Claims Per Year</p>
                             <p className="text-xl font-bold text-slate-900">{planDetails.claimsPerYear}</p>
                         </div>
-                        <div className="p-5">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Service Fee</p>
+                        <div className="p-5 sm:border-l sm:border-slate-100 md:border-l-0">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Service Fee</p>
                             <p className="text-xl font-bold text-slate-900">{planDetails.serviceFee}</p>
                         </div>
                     </div>
@@ -131,8 +131,8 @@ const Dashboard = () => {
                         <Link
                             to="/member/file-claim"
                             className={`flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-bold transition-all ${coverageStarted
-                                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                    : "bg-slate-700 text-slate-500 cursor-not-allowed pointer-events-none"
+                                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                : "bg-slate-700 text-slate-500 cursor-not-allowed pointer-events-none"
                                 }`}
                         >
                             {coverageStarted ? (

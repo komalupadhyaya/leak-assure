@@ -15,6 +15,7 @@ import MemberDetail from "./pages/admin/MemberDetail";
 import Claims from "./pages/admin/Claims";
 import ClaimDetail from "./pages/admin/ClaimDetail";
 import Payments from "./pages/admin/Payments";
+import Vendors from "./pages/admin/Vendors";
 import { Affiliates, Settings as AdminSettings } from "./pages/admin/Placeholders";
 import Login from "./pages/auth/Login";
 import MemberDashboard from "./pages/member/Dashboard";
@@ -76,6 +77,7 @@ const App = () => (
           <Route path="/admin/claims" element={<ProtectedRoute requiredRole="admin"><Claims /></ProtectedRoute>} />
           <Route path="/admin/claims/:id" element={<ProtectedRoute requiredRole="admin"><ClaimDetail /></ProtectedRoute>} />
           <Route path="/admin/payments" element={<ProtectedRoute requiredRole="admin"><Payments /></ProtectedRoute>} />
+          <Route path="/admin/vendors" element={<ProtectedRoute requiredRole="admin"><Vendors /></ProtectedRoute>} />
           <Route path="/admin/affiliates" element={<ProtectedRoute requiredRole="admin"><Affiliates /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminSettings /></ProtectedRoute>} />
 

@@ -32,9 +32,10 @@ const ClaimSchema = new mongoose.Schema({
         enum: ['Low', 'Medium', 'High'],
         default: 'Medium'
     },
-    assignedVendor: {
-        type: String,
-        default: ''
+    assignedVendorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Vendor',
+        default: null
     },
     photos: [{
         type: String

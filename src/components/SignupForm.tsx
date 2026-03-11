@@ -1,28 +1,29 @@
 import { useState, useEffect } from "react";
 import { startSignup } from "@/services/api";
 import { AddressAutocomplete } from "./AddressAutocomplete";
+import { X } from "lucide-react";
 
 // ──────────────────────────────────────────────
 // Coverage Terms Modal
 // ──────────────────────────────────────────────
 function CoverageTermsModal({ onClose }: { onClose: () => void }) {
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] sm:max-h-[80vh] flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-900">Service Contract Policy</h2>
+                <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100">
+                    <h2 className="text-lg font-bold text-gray-900 font-sans">Policy Coverage Terms</h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors text-2xl leading-none"
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                         aria-label="Close"
                     >
-                        &times;
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
                 {/* Body */}
-                <div className="overflow-y-auto px-6 py-5 text-sm text-gray-700 space-y-4">
+                <div className="overflow-y-auto px-5 sm:px-6 py-5 text-sm text-slate-600 space-y-4">
                     <p className="font-semibold text-gray-900 underline">Leak Assure — Service Contract Terms</p>
 
                     <p>

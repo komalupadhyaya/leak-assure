@@ -128,9 +128,9 @@ const Members = () => {
                 </div>
 
                 {/* Table */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm transition-all">
-                    <div className="overflow-x-visible md:overflow-x-auto">
-                        <table className="w-full text-left text-sm">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm min-w-[1000px]">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
                                     <th className="px-5 py-4 whitespace-nowrap">Member Name</th>

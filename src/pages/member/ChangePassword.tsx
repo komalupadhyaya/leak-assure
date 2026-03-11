@@ -54,13 +54,13 @@ const ChangePassword = () => {
             </nav>
 
             <main className="max-w-[440px] mx-auto w-full">
-                <div className="bg-white rounded-2xl shadow-xl p-10 border border-slate-100">
-                    <div className="text-center mb-8">
-                        <div className="h-16 w-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                            <Lock className="h-8 w-8 text-blue-600" />
+                <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-10 border border-slate-100">
+                    <div className="text-center mb-6 sm:mb-8">
+                        <div className="h-12 w-12 sm:h-16 sm:w-16 bg-blue-50 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                            <Lock className="h-6 w-6 sm:h-8 sm:h-8 text-blue-600" />
                         </div>
-                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Secure Your Account</h1>
-                        <p className="text-slate-500 text-sm">
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Secure Your Account</h1>
+                        <p className="text-slate-500 text-xs sm:text-sm">
                             Please set a permanent password to continue to your dashboard.
                         </p>
                     </div>

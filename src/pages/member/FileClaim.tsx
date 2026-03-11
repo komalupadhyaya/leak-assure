@@ -41,16 +41,16 @@ const FileClaim = () => {
 
     return (
         <MemberLayout>
-            <div className="max-w-2xl mx-auto space-y-10">
+            <div className="max-w-2xl mx-auto space-y-6 sm:space-y-10">
                 <header className="text-center">
-                    <div className="inline-flex items-center justify-center p-3 bg-blue-100 rounded-3xl mb-4">
-                        <ClipboardList className="h-8 w-8 text-blue-600" />
+                    <div className="inline-flex items-center justify-center p-2.5 sm:p-3 bg-blue-100 rounded-2xl sm:rounded-3xl mb-3 sm:mb-4">
+                        <ClipboardList className="h-6 w-6 sm:h-8 sm:h-8 text-blue-600" />
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-900">Submit a New Claim</h1>
-                    <p className="text-slate-500 mt-2">Describe the issue and our team will coordinate a repair.</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Submit a New Claim</h1>
+                    <p className="text-sm sm:text-base text-slate-500 mt-2">Describe the issue and our team will coordinate a repair.</p>
                 </header>
 
-                <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-8">
+                <form onSubmit={handleSubmit} className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm space-y-6 sm:space-y-8">
                     <div className="space-y-6">
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-slate-700">Type of Issue</label>

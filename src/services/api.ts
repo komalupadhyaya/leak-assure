@@ -151,7 +151,7 @@ export async function updateClaimStatus(id: string, status: string) {
     return res.json();
 }
 
-export async function assignVendor(id: string, vendor: string) {
+export async function assignVendor(id: string, vendorId: string | null) {
     const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/claims/${id}/vendor`, {
         method: 'PATCH',
@@ -159,7 +159,7 @@ export async function assignVendor(id: string, vendor: string) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ vendor }),
+        body: JSON.stringify({ vendorId }),
     });
     if (!res.ok) throw new Error('Failed to assign vendor');
     return res.json();
@@ -270,6 +270,30 @@ export async function createVendor(vendorData: any) {
         body: JSON.stringify(vendorData),
     });
     if (!res.ok) throw new Error('Failed to create vendor');
+    return res.json();
+}
+
+export async function updateVendor(id: string, vendorData: any) {
+    const token = localStorage.getItem('admin_token');
+    const res = await fetch(`${API_BASE}/api/vendors/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(vendorData),
+    });
+    if (!res.ok) throw new Error('Failed to update vendor');
+    return res.json();
+}
+
+export async function deleteVendor(id: string) {
+    const token = localStorage.getItem('admin_token');
+    const res = await fetch(`${API_BASE}/api/vendors/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to delete vendor');
     return res.json();
 }
 

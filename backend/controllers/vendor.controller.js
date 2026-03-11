@@ -31,3 +31,25 @@ exports.getVendorById = async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+exports.updateVendor = async (req, res) => {
+    try {
+        const vendor = await Vendor.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+        res.json(vendor);
+    } catch (error) {
+        console.error('Error updating vendor:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.deleteVendor = async (req, res) => {
+    try {
+        const vendor = await Vendor.findByIdAndDelete(req.params.id);
+        if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+        res.json({ message: 'Vendor deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting vendor:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};

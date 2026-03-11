@@ -17,9 +17,9 @@ const VendorSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    serviceArea: {
+    notes: {
         type: String,
-        required: true
+        default: ''
     },
     createdAt: {
         type: Date,

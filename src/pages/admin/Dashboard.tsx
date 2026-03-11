@@ -120,17 +120,17 @@ const Dashboard = () => {
                 </div>
 
                 {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                         {Array.from({ length: 8 }).map((_, i) => (
                             <div key={i} className="bg-white p-6 rounded-xl border border-slate-200 animate-pulse h-28" />
                         ))}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                         {cards.map((card, i) => (
                             <div
                                 key={i}
-                                className={`bg-white p-6 rounded-xl border shadow-sm flex flex-col gap-4 ${card.border}`}
+                                className={`bg-white p-5 sm:p-6 rounded-xl border shadow-sm flex flex-col gap-4 ${card.border}`}
                             >
                                 <div className="flex items-center justify-between">
                                     <div className={`p-2.5 rounded-lg ${card.bg}`}>

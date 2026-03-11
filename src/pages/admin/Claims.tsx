@@ -133,9 +133,9 @@ const Claims = () => {
                     ))}
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm transition-all">
-                    <div className="overflow-x-visible md:overflow-x-auto">
-                        <table className="w-full text-left text-sm">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm min-w-[1100px]">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                     <th className="px-5 py-4 whitespace-nowrap">Claim ID</th>
@@ -203,11 +203,11 @@ const Claims = () => {
                                                     {claim.status}
                                                 </span>
                                             </td>
-                                            <td className="px-5 py-3.5 text-xs text-slate-600 font-medium">
-                                                {claim.assignedVendor ? (
+                                            <td className="px-5 py-3.5 text-xs text-slate-600 font-medium tracking-tight">
+                                                {claim.assignedVendorId ? (
                                                     <div className="flex items-center gap-2">
-                                                        <Truck className="h-3 w-3 text-slate-300" />
-                                                        {claim.assignedVendor}
+                                                        <Truck className="h-3.5 w-3.5 text-blue-500" />
+                                                        <span className="font-bold text-slate-900">{claim.assignedVendorId.name}</span>
                                                     </div>
                                                 ) : <span className="text-slate-300 italic">Unassigned</span>}
                                             </td>

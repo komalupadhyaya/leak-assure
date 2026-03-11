@@ -51,20 +51,20 @@ const Settings = () => {
 
     return (
         <MemberLayout>
-            <div className="max-w-4xl mx-auto space-y-12 pb-20">
+            <div className="max-w-4xl mx-auto space-y-8 lg:space-y-12 pb-20">
                 <header>
-                    <h1 className="text-3xl font-bold text-slate-900">Account Settings</h1>
-                    <p className="text-slate-500 mt-2">Manage your personal information and subscription preferrences.</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Account Settings</h1>
+                    <p className="text-sm sm:text-base text-slate-500 mt-1 sm:mt-2">Manage your personal information and subscription preferrences.</p>
                 </header>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
                     {/* Primary Settings */}
-                    <div className="md:col-span-2 space-y-8">
-                        <section className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
-                            <div className="p-8 border-b border-slate-100">
+                    <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+                        <section className="bg-white rounded-2xl lg:rounded-3xl border border-slate-200 overflow-hidden">
+                            <div className="p-6 lg:p-8 border-b border-slate-100">
                                 <h3 className="font-bold text-lg">Personal Details</h3>
                             </div>
-                            <div className="p-8 space-y-6">
+                            <div className="p-6 lg:p-8 space-y-6">
                                 <div className="flex items-center gap-4">
                                     <div className="h-10 w-10 bg-slate-100 rounded-full flex items-center justify-center">
                                         <User className="h-5 w-5 text-slate-400" />

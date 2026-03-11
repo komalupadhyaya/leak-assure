@@ -57,6 +57,13 @@ exports.login = async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
+        // Prevent admin login through member portal
+        if (user.role !== 'member') {
+            return res.status(403).json({
+                error: 'Access denied. Admin users must use the admin portal.'
+            });
+        }
+
         // Prevent login if subscription is not active
         if (user.subscriptionStatus !== 'active') {
             const message = user.subscriptionStatus === 'canceled'

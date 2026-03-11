@@ -1,4 +1,7 @@
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // For production, use real SMTP credentials.
 // For testing, this will log to console if variables are missing.
@@ -92,3 +95,47 @@ For security, please change your password after logging in.`;
     sendEmail(email, subject, text, html);
 };
 
+
+exports.sendEnrollmentConfirmationEmail = async (user) => {
+    try {
+        console.log("Sending enrollment confirmation email to:", user.email);
+
+        const html = `
+            <h2>Your Leak Assure Protection Plan is Active</h2>
+            <p>Hello ${user.fullName},</p>
+            <p>Thank you for enrolling in Leak Assure.</p>
+            <p>Your protection plan has been successfully activated.</p>
+            <h3>Coverage Summary</h3>
+            <ul>
+                <li><strong>Plan:</strong> ${user.plan === 'premium' ? 'Premium Plan' : 'Essential Plan'}</li>
+                <li><strong>Service Address:</strong> ${user.serviceAddress}</li>
+                <li><strong>Monthly Price:</strong> $${user.planPrice || (user.plan === 'premium' ? 49 : 29)}</li>
+                <li><strong>Coverage Start Date:</strong> ${user.waitingPeriodEnd ? new Date(user.waitingPeriodEnd).toLocaleDateString() : '30 days from today'}</li>
+            </ul>
+            <p><strong>Important Notice</strong></p>
+            <p>Your coverage begins after the 30-day waiting period.</p>
+            <p>Keep this email for your records.</p>
+            <p>You can access your account using the Member Portal.</p>
+            <p>Thank you for choosing Leak Assure.</p>
+`;
+
+        const { data, error } = await resend.emails.send({
+            from: process.env.EMAIL_FROM || 'noreply@leakassure.com',
+            to: user.email,
+            subject: "Your Leak Assure Protection Plan is Active",
+            html: html
+        });
+
+        if (error) {
+            console.error("RESEND ERROR:", error);
+            throw new Error(`Email delivery failed: ${error.message}`);
+        }
+
+        console.log("Confirmation email sent successfully:", data.id);
+        return data;
+
+    } catch (err) {
+        console.error("EMAIL SERVICE ERROR:", err);
+        throw err;
+    }
+};

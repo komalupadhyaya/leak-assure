@@ -103,9 +103,9 @@ const Payments = () => {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible">
-                        <div className="overflow-x-visible md:overflow-x-auto">
-                            <table className="w-full text-left text-sm">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm min-w-[1100px]">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                         <th className="px-6 py-4 whitespace-nowrap">Member Name</th>

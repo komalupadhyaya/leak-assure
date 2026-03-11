@@ -29,6 +29,14 @@ exports.startSignup = async (req, res) => {
 
     const { fullName, email, phone, serviceAddress, plan, smsOptIn, password } = parseResult.data;
 
+    // 1.5. Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+        return res.status(400).json({
+            error: 'This email is already registered. Please log in.'
+        });
+    }
+
     // 2. Resolve Stripe price ID
     let priceId;
     if (plan === 'essential') {

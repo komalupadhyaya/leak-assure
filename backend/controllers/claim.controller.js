@@ -39,6 +39,7 @@ exports.getAllClaims = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const claims = await Claim.find()
+            .populate('assignedVendorId', 'name company phone email')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
@@ -60,7 +61,7 @@ exports.getAllClaims = async (req, res) => {
 
 exports.getClaimById = async (req, res) => {
     try {
-        const claim = await Claim.findById(req.params.id);
+        const claim = await Claim.findById(req.params.id).populate('assignedVendorId', 'name company phone email');
         if (!claim) return res.status(404).json({ error: 'Claim not found' });
         res.json(claim);
     } catch (error) {
@@ -107,12 +108,13 @@ exports.updateClaimStatus = async (req, res) => {
 
 exports.assignVendor = async (req, res) => {
     try {
-        const { vendor } = req.body; // Can be a string name or vendor ID
+        const { vendorId } = req.body;
         const claim = await Claim.findByIdAndUpdate(
             req.params.id,
-            { assignedVendor: vendor },
+            { assignedVendorId: vendorId || null },
             { new: true }
-        );
+        ).populate('assignedVendorId', 'name company');
+
         if (!claim) return res.status(404).json({ error: 'Claim not found' });
 
         await AuditLog.create({
@@ -120,17 +122,21 @@ exports.assignVendor = async (req, res) => {
             action: 'ASSIGN_VENDOR',
             targetType: 'Claim',
             targetId: claim._id,
-            metadata: { vendor }
+            metadata: { vendorId }
         });
 
         // Notify member about scheduling if a professional is assigned
         const User = require('../models/User');
         const user = await User.findById(claim.memberId);
-        if (user && vendor) {
+        if (user && claim.assignedVendorId) {
             const smsService = require('../services/sms.service');
             const scheduledDate = new Date();
             scheduledDate.setDate(scheduledDate.getDate() + 1); // Mock scheduling for tomorrow
-            smsService.sendServiceScheduledSMS(user.phone, scheduledDate.toLocaleDateString(), vendor);
+            smsService.sendServiceScheduledSMS(
+                user.phone,
+                scheduledDate.toLocaleDateString(),
+                claim.assignedVendorId.name
+            );
         }
 
         res.json(claim);

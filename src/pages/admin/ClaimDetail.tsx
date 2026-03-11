@@ -22,7 +22,7 @@ const ClaimDetail = () => {
     const [claim, setClaim] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [newNote, setNewNote] = useState("");
-    const [vendorName, setVendorName] = useState("");
+    const [selectedVendorId, setSelectedVendorId] = useState("");
     const [vendors, setVendors] = useState<any[]>([]);
 
     const fetchClaim = async () => {
@@ -30,7 +30,7 @@ const ClaimDetail = () => {
             if (id) {
                 const data = await getClaimById(id);
                 setClaim(data);
-                setVendorName(data.assignedVendor || "");
+                setSelectedVendorId(data.assignedVendorId?._id || "");
             }
         } catch (error) {
             console.error("Error fetching claim:", error);
@@ -68,7 +68,7 @@ const ClaimDetail = () => {
     const handleAssignVendor = async () => {
         try {
             if (id) {
-                await assignVendor(id, vendorName);
+                await assignVendor(id, selectedVendorId);
                 toast.success("Vendor assigned");
                 fetchClaim();
             }
@@ -209,25 +209,37 @@ const ClaimDetail = () => {
                                     <label className="text-xs font-medium text-slate-500 uppercase tracking-tighter">Assign Plumber / Vendor</label>
                                     <div className="flex gap-2">
                                         <select
-                                            className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500"
-                                            value={vendorName}
-                                            onChange={(e) => setVendorName(e.target.value)}
+                                            className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 font-medium"
+                                            value={selectedVendorId}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val === "ADD_NEW") {
+                                                    navigate(`/admin/vendors?add=true&returnTo=/admin/claims/${id}`);
+                                                } else {
+                                                    setSelectedVendorId(val);
+                                                }
+                                            }}
                                         >
                                             <option value="">Select a professional...</option>
                                             {vendors.map(v => (
-                                                <option key={v._id} value={v.name}>{v.name} ({v.company})</option>
+                                                <option key={v._id} value={v._id}>{v.name} ({v.company})</option>
                                             ))}
-                                            {!vendors.find(v => v.name === vendorName) && vendorName && (
-                                                <option value={vendorName}>{vendorName}</option>
-                                            )}
+                                            <option value="ADD_NEW" className="text-blue-600 font-bold italic">+ Add New Professional...</option>
                                         </select>
                                         <button
                                             onClick={handleAssignVendor}
-                                            className="bg-slate-900 text-white p-2.5 rounded-lg hover:bg-slate-800 transition-colors"
+                                            title="Assign professional to claim"
+                                            className="bg-blue-600 text-white p-2.5 rounded-lg hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100"
                                         >
                                             <Truck className="h-5 w-5" />
                                         </button>
                                     </div>
+                                    {claim.assignedVendorId && (
+                                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-1 flex items-center gap-1">
+                                            <CheckCircle2 className="h-3 w-3" />
+                                            Currently Assigned: {claim.assignedVendorId.name}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>

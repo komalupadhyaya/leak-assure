@@ -104,23 +104,30 @@ exports.handleWebhook = async (req, res) => {
 
             const emailService = require('../services/email.service');
 
+            // --- SEND ENROLLMENT CONFIRMATION EMAIL (RESEND) ---
+            if (!user.confirmationEmailSent) {
+                console.log("Sending enrollment confirmation email");
+                try {
+                    await emailService.sendEnrollmentConfirmationEmail(user);
+                    user.confirmationEmailSent = true;
+                    await user.save();
+                    console.log("Confirmation email sent successfully");
+                } catch (emailError) {
+                    console.error("EMAIL DELIVERY FAILED");
+                    console.error(emailError);
+                    // Do not break the webhook, just log it.
+                }
+            } else {
+                console.log("Enrollment email already sent, skipping duplicate.");
+            }
+
+            // --- LEGACY EMAIL CALLS (kept for credentials if needed) ---
             if (sendCredentials) {
-
-                console.log("Sending login credentials email");
-
+                console.log("Sending additional login credentials email");
                 emailService.sendLoginCredentials(
                     user.email,
                     user.fullName,
                     tempPassword
-                );
-
-            } else {
-
-                console.log("Sending signup confirmation email");
-
-                emailService.sendSignupConfirmation(
-                    user.email,
-                    user.fullName
                 );
             }
 

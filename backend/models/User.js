@@ -9,6 +9,7 @@ const UserSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
+        unique: true,
         index: true,
         lowercase: true,
         trim: true,
@@ -78,6 +79,10 @@ const UserSchema = new mongoose.Schema({
     },
     lastPaymentDate: {
         type: Date,
+    },
+    confirmationEmailSent: {
+        type: Boolean,
+        default: false,
     },
     createdAt: {
         type: Date,
