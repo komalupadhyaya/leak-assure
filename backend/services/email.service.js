@@ -107,11 +107,12 @@ For security, please change your password after logging in.`;
 
 
 exports.sendEnrollmentConfirmationEmail = async (user) => {
-    try {
-        const isProduction = process.env.NODE_ENV === 'production';
-        const adminEmail = process.env.EMAIL_RECEIVER || "komalsoftiatric@gmail.com";
-        const portalUrl = process.env.MEMBER_PORTAL || "http://localhost:8080/login";
+    const isProduction = process.env.APP_ENV === 'production';
+    const adminEmail = process.env.EMAIL_RECEIVER || "komalsoftiatric@gmail.com";
+    const portalUrl = process.env.MEMBER_PORTAL || "http://localhost:8080/login";
+    const fromEmail = process.env.EMAIL_FROM || (isProduction ? 'noreply@leakassure.com' : 'onboarding@resend.dev');
 
+    try {
         console.log("Preparing enrollment confirmation email for:", user.email);
 
         const planDetails = user.plan === 'premium' ? {
@@ -128,9 +129,9 @@ exports.sendEnrollmentConfirmationEmail = async (user) => {
             fee: '$99 service fee per claim'
         };
 
-        const html = `
+        const generateHtml = (isFallback = false) => `
             <!DOCTYPE html>
-            <html>
+            <html>  
             <head>
                 <style>
                     .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; }
@@ -148,10 +149,16 @@ exports.sendEnrollmentConfirmationEmail = async (user) => {
                     .button { display: block; width: 220px; margin: 30px auto; background-color: #2b6cb0; color: #ffffff !important; text-align: center; padding: 14px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; }
                     .notice { font-size: 13px; color: #718096; font-style: italic; text-align: center; }
                     .footer { font-size: 11px; color: #a0aec0; text-align: center; margin-top: 40px; border-top: 1px solid #edf2f7; padding-top: 20px; }
+                    .fallback-notice { background-color: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
                 </style>
             </head>
             <body>
                 <div class="container">
+                    ${isFallback ? `
+                    <div class="fallback-notice">
+                        <strong>Notice:</strong> This email was redirected to the monitoring inbox because the Resend account is still in testing mode and cannot send to external recipients.<br>
+                        <strong>Original Recipient:</strong> ${user.email}
+                    </div>` : ''}
                     <div class="header">
                         <div class="badge">✓ ACTIVATED</div>
                         <div class="hero-text">You're Covered</div>
@@ -220,33 +227,52 @@ exports.sendEnrollmentConfirmationEmail = async (user) => {
 
         const resend = getResendClient();
 
-        let mailOptions;
-        if (isProduction) {
-            mailOptions = {
-                from: process.env.EMAIL_FROM || 'noreply@leakassure.com',
-                to: user.email,
-                bcc: adminEmail,
-                subject: "You're Covered: Leak Assure Enrollment Confirmation",
-                html: html
-            };
-        } else {
-            mailOptions = {
-                from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-                to: [user.email, adminEmail],
-                subject: "[DEV] You're Covered: Leak Assure Enrollment Confirmation",
-                html: html
-            };
-        }
+        console.log("Attempting to send email to member:", user.email);
 
-        const { data, error } = await resend.emails.send(mailOptions);
+        const primaryMailOptions = {
+            from: fromEmail,
+            to: isProduction ? user.email : [user.email, adminEmail],
+            bcc: isProduction ? adminEmail : undefined,
+            subject: isProduction
+                ? "You're Covered: Leak Assure Enrollment Confirmation"
+                : `[DEV] You're Covered: Leak Assure Enrollment Confirmation`,
+            html: generateHtml(false)
+        };
+
+        const { data, error } = await resend.emails.send(primaryMailOptions);
 
         if (error) {
+            // Check if it's a Resend validation error related to testing mode
+            const isBlockedError = error.name === 'validation_error' ||
+                (error.message && error.message.includes("testing emails to your own email address"));
+
+            if (!isProduction && isBlockedError) {
+                console.log("Email blocked by Resend. Sending fallback to monitoring email:", adminEmail);
+
+                const fallbackMailOptions = {
+                    from: fromEmail,
+                    to: adminEmail,
+                    subject: `[TEST MODE] Enrollment Confirmation for ${user.email}`,
+                    html: generateHtml(true)
+                };
+
+                const fallbackResult = await resend.emails.send(fallbackMailOptions);
+
+                if (fallbackResult.error) {
+                    throw new Error(`Fallback email delivery failed: ${fallbackResult.error.message}`);
+                }
+
+                return fallbackResult.data;
+            }
+
             console.error("RESEND ERROR:", error);
             throw new Error(`Email delivery failed: ${error.message}`);
         }
 
         console.log("Enrollment confirmation email sent to:", user.email);
-        console.log("Monitoring copy sent to:", adminEmail);
+        if (isProduction || !isProduction) {
+            console.log("Monitoring copy sent to:", adminEmail);
+        }
         return data;
 
     } catch (err) {
