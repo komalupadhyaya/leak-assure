@@ -13,11 +13,13 @@ import {
     ArrowRight
 } from "lucide-react";
 import { toast } from "sonner";
+import { AlertModal } from "@/components/ui/AlertModal";
 
 const Settings = () => {
     const navigate = useNavigate();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
     const fetchProfile = async () => {
         try {
@@ -34,16 +36,20 @@ const Settings = () => {
         fetchProfile();
     }, []);
 
-    const handleCancelClick = async () => {
-        if (confirm("Are you sure you want to cancel your coverage? Your home will no longer be protected starting the next billing cycle.")) {
-            try {
-                await memberCancelSelf();
-                toast.success("Subscription has been canceled.");
-                fetchProfile();
-            } catch (error) {
-                toast.error("Failed to cancel subscription. Please contact support.");
-            }
+    const handleCancelConfirm = async () => {
+        try {
+            await memberCancelSelf();
+            toast.success("Subscription has been canceled.");
+            fetchProfile();
+        } catch (error) {
+            toast.error("Failed to cancel subscription. Please contact support.");
+        } finally {
+            setIsCancelModalOpen(false);
         }
+    };
+
+    const handleCancelClick = () => {
+        setIsCancelModalOpen(true);
     };
 
     if (loading) return <MemberLayout>Loading...</MemberLayout>;
@@ -160,6 +166,17 @@ const Settings = () => {
                     </div>
                 </div>
             </div>
+
+            <AlertModal
+                isOpen={isCancelModalOpen}
+                onOpenChange={setIsCancelModalOpen}
+                title="Confirm Cancellation"
+                description="Are you sure you want to cancel your coverage? Your home will no longer be protected starting the next billing cycle."
+                confirmText="Cancel Coverage"
+                cancelText="Keep My Protection"
+                onConfirm={handleCancelConfirm}
+                variant="destructive"
+            />
         </MemberLayout>
     );
 };

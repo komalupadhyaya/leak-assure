@@ -20,20 +20,108 @@ exports.getMe = async (req, res) => {
 exports.memberFileClaim = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
-        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (!user) {
+            console.log("Claim attempt rejected: User not found");
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // --- RULE 1: ROLE PROTECTION ---
+        if (user.role !== 'member') {
+            console.log(`Claim rejection: Admin attempt by ${user.email}`);
+            return res.status(403).json({
+                error: "Only members can submit claims."
+            });
+        }
+
+        // --- RULE 2: WAITING PERIOD ENFORCEMENT ---
+        if (user.waitingPeriodEnd && new Date() < user.waitingPeriodEnd) {
+            console.log(`Claim rejection: Waiting period not ended for ${user.email}`);
+            return res.status(403).json({
+                error: "Coverage has not started yet. Claims can be submitted after the waiting period."
+            });
+        }
+
+        // --- RULE 3: DUPLICATE PREVENTION ---
+        const lastClaim = await Claim.findOne({ memberId: user._id }).sort({ createdAt: -1 });
+        if (lastClaim) {
+            const secondsSinceLastClaim = (new Date().getTime() - new Date(lastClaim.createdAt).getTime()) / 1000;
+            if (secondsSinceLastClaim < 30) {
+                console.log(`Claim rejection: Duplicate attempt by ${user.email} (${Math.round(secondsSinceLastClaim)}s since last)`);
+                return res.status(429).json({
+                    error: "A claim was recently submitted. Please wait a moment before submitting another."
+                });
+            }
+        }
+
+        // --- RULE 4: YEARLY CLAIM LIMIT ---
+        const currentYear = new Date().getFullYear();
+        const startOfYear = new Date(currentYear, 0, 1);
+        const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
+
+        const claimsThisYear = await Claim.countDocuments({
+            memberId: user._id,
+            createdAt: { $gte: startOfYear, $lte: endOfYear }
+        });
+
+        const allowedClaims = user.plan === 'premium' ? 3 : 2;
+
+        if (claimsThisYear >= allowedClaims) {
+            console.log(`Claim rejection: Yearly limit reached for ${user.email} (${user.plan})`);
+            return res.status(403).json({
+                error: "You have reached the maximum number of claims allowed for your plan this year."
+            });
+        }
+
+        // --- RULE 5: PLAN DETAILS ENRICHMENT ---
+        const incidentLimit = user.plan === 'premium' ? 2000 : 1000;
+        const serviceFee = user.plan === 'premium' ? 49 : 99;
+
+        console.log(`Attempting to send email for claim by: ${user.email}`);
 
         const claim = new Claim({
             ...req.body,
             memberId: user._id,
             memberName: user.fullName,
             serviceAddress: user.serviceAddress,
-            status: 'New'
+            status: 'new',
+            incidentLimit,
+            serviceFee,
+            planType: user.plan
         });
 
         await claim.save();
-        res.status(201).json(claim);
+
+        console.log(`Claim submission success for: ${user.email}`);
+
+        res.status(201).json({
+            success: true,
+            message: "Your claim has been submitted successfully. Our team will review it shortly.",
+            claim
+        });
     } catch (error) {
         console.error('Error filing member claim:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.getMemberClaims = async (req, res) => {
+    try {
+        const claims = await Claim.find({ memberId: req.user.id })
+            .select('_id issueType status priority createdAt')
+            .sort({ createdAt: -1 });
+
+        // Map _id to claimId for frontend consistency if needed
+        const formattedClaims = claims.map(c => ({
+            claimId: c._id,
+            issueType: c.issueType,
+            status: c.status,
+            priority: c.priority,
+            createdAt: c.createdAt
+        }));
+
+        res.json(formattedClaims);
+    } catch (error) {
+        console.error('Error fetching member claims:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };

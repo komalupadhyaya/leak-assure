@@ -164,7 +164,6 @@ exports.sendEnrollmentConfirmationEmail = async (user) => {
                         <div class="hero-text">You're Covered</div>
                         <p style="color: #4a5568;">Your Leak Assure protection plan has been successfully activated.</p>
                     </div>
-
                     <div class="section">
                         <div class="details-box">
                             <div class="detail-row">

@@ -229,6 +229,15 @@ export async function fileMemberClaim(claimData: any) {
     return res.json();
 }
 
+export async function getMemberClaims() {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_BASE}/api/member/claims`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch claim history');
+    return res.json();
+}
+
 export async function memberCancelSelf() {
     const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/member/cancel`, {
@@ -299,7 +308,7 @@ export async function deleteVendor(id: string) {
 
 export const changePassword = async (newPassword: string): Promise<{ message: string }> => {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE}/auth/update-password`, {
+    const response = await fetch(`${API_BASE}/api/auth/update-password`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

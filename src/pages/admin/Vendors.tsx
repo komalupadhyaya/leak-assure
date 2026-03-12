@@ -23,6 +23,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AlertModal } from "@/components/ui/AlertModal";
 
 const Vendors = () => {
     const navigate = useNavigate();
@@ -30,6 +31,8 @@ const Vendors = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [vendorToDelete, setVendorToDelete] = useState<string | null>(null);
     const [editingVendor, setEditingVendor] = useState<any>(null);
     const [formData, setFormData] = useState({
         name: "",
@@ -110,16 +113,23 @@ const Vendors = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (confirm("Are you sure you want to delete this vendor?")) {
-            try {
-                await deleteVendor(id);
-                toast.success("Vendor deleted");
-                fetchVendors();
-            } catch (error) {
-                toast.error("Failed to delete vendor");
-            }
+    const handleDeleteConfirm = async () => {
+        if (!vendorToDelete) return;
+        try {
+            await deleteVendor(vendorToDelete);
+            toast.success("Vendor deleted");
+            fetchVendors();
+        } catch (error) {
+            toast.error("Failed to delete vendor");
+        } finally {
+            setIsDeleteModalOpen(false);
+            setVendorToDelete(null);
         }
+    };
+
+    const handleDeleteClick = (id: string) => {
+        setVendorToDelete(id);
+        setIsDeleteModalOpen(true);
     };
 
     const filteredVendors = vendors.filter(v =>
@@ -230,7 +240,7 @@ const Vendors = () => {
                                                         <Edit2 className="h-4 w-4" /> Edit Vendor
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
-                                                        onClick={() => handleDelete(vendor._id)}
+                                                        onClick={() => handleDeleteClick(vendor._id)}
                                                         className="flex items-center gap-2 py-2 cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-700 rounded-lg"
                                                     >
                                                         <Trash2 className="h-4 w-4" /> Delete Vendor
@@ -339,6 +349,17 @@ const Vendors = () => {
                     </div>
                 </div>
             )}
+
+            <AlertModal
+                isOpen={isDeleteModalOpen}
+                onOpenChange={setIsDeleteModalOpen}
+                title="Delete Vendor"
+                description="Are you sure you want to delete this vendor? This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                onConfirm={handleDeleteConfirm}
+                variant="destructive"
+            />
         </AdminLayout>
     );
 };

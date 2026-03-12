@@ -24,8 +24,8 @@ const ClaimSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['New', 'Under Review', 'Approved', 'Denied', 'Scheduled', 'Completed', 'Closed'],
-        default: 'New'
+        enum: ['new', 'under_review', 'approved', 'denied', 'scheduled', 'completed', 'closed'],
+        default: 'new'
     },
     priority: {
         type: String,
@@ -42,7 +42,20 @@ const ClaimSchema = new mongoose.Schema({
     }],
     notes: [{
         type: String
-    }]
+    }],
+    incidentLimit: {
+        type: Number,
+        required: true
+    },
+    serviceFee: {
+        type: Number,
+        required: true
+    },
+    planType: {
+        type: String,
+        enum: ['essential', 'premium'],
+        required: true
+    }
 }, {
     timestamps: true
 });

@@ -20,6 +20,7 @@ import {
     History
 } from "lucide-react";
 import { toast } from "sonner";
+import { AlertModal } from "@/components/ui/AlertModal";
 
 const MemberDetail = () => {
     const { id } = useParams();
@@ -29,6 +30,7 @@ const MemberDetail = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'claims' | 'payments' | 'notes'>('claims');
     const [newNote, setNewNote] = useState("");
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
     const fetchMemberData = async () => {
         try {
@@ -52,18 +54,22 @@ const MemberDetail = () => {
         fetchMemberData();
     }, [id]);
 
-    const handleCancelClick = async () => {
-        if (confirm("Are you sure you want to cancel this subscription? This will stop recurring billing in Stripe.")) {
-            try {
-                if (id) {
-                    await cancelSubscription(id);
-                    toast.success("Subscription canceled successfully");
-                    fetchMemberData();
-                }
-            } catch (error) {
-                toast.error("Failed to cancel subscription");
+    const handleCancelConfirm = async () => {
+        try {
+            if (id) {
+                await cancelSubscription(id);
+                toast.success("Subscription canceled successfully");
+                fetchMemberData();
             }
+        } catch (error) {
+            toast.error("Failed to cancel subscription");
+        } finally {
+            setIsCancelModalOpen(false);
         }
+    };
+
+    const handleCancelClick = () => {
+        setIsCancelModalOpen(true);
     };
 
     const handleAddNote = async () => {
@@ -325,6 +331,17 @@ const MemberDetail = () => {
                     </div>
                 </div>
             </div>
+
+            <AlertModal
+                isOpen={isCancelModalOpen}
+                onOpenChange={setIsCancelModalOpen}
+                title="Cancel Subscription"
+                description={`Are you sure you want to cancel ${member.fullName}'s subscription? This will stop recurring billing in Stripe.`}
+                confirmText="Cancel Subscription"
+                cancelText="Keep Active"
+                onConfirm={handleCancelConfirm}
+                variant="destructive"
+            />
         </AdminLayout>
     );
 };

@@ -23,11 +23,14 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AlertModal } from "@/components/ui/AlertModal";
 
 const Members = () => {
     const [members, setMembers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+    const [memberToCancel, setMemberToCancel] = useState<{ id: string; name: string } | null>(null);
     const navigate = useNavigate();
 
     const fetchMembers = async () => {
@@ -47,16 +50,23 @@ const Members = () => {
         fetchMembers();
     }, []);
 
-    const handleCancel = async (id: string, name: string) => {
-        if (confirm(`Cancel ${name}'s subscription? This will stop their billing.`)) {
-            try {
-                await cancelSubscription(id);
-                toast.success("Subscription canceled successfully");
-                fetchMembers();
-            } catch {
-                toast.error("Failed to cancel subscription");
-            }
+    const handleCancelConfirm = async () => {
+        if (!memberToCancel) return;
+        try {
+            await cancelSubscription(memberToCancel.id);
+            toast.success("Subscription canceled successfully");
+            fetchMembers();
+        } catch {
+            toast.error("Failed to cancel subscription");
+        } finally {
+            setIsCancelModalOpen(false);
+            setMemberToCancel(null);
         }
+    };
+
+    const handleCancelClick = (id: string, name: string) => {
+        setMemberToCancel({ id, name });
+        setIsCancelModalOpen(true);
     };
 
     const handleMarkInactive = async (id: string) => {
@@ -230,7 +240,7 @@ const Members = () => {
                                                             </DropdownMenuItem>
                                                             <div className="border-t border-slate-100 my-1" />
                                                             <DropdownMenuItem
-                                                                onClick={() => handleCancel(member._id, member.fullName)}
+                                                                onClick={() => handleCancelClick(member._id, member.fullName)}
                                                                 className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                                             >
                                                                 <XCircle className="h-4 w-4 mr-2" /> Cancel Subscription
@@ -253,6 +263,17 @@ const Members = () => {
                     </div>
                 </div>
             </div>
+
+            <AlertModal
+                isOpen={isCancelModalOpen}
+                onOpenChange={setIsCancelModalOpen}
+                title="Cancel Subscription"
+                description={`Are you sure you want to cancel ${memberToCancel?.name}'s subscription? This will stop their billing.`}
+                confirmText="Cancel Subscription"
+                cancelText="Keep Active"
+                onConfirm={handleCancelConfirm}
+                variant="destructive"
+            />
         </AdminLayout>
     );
 };

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import MemberLayout from "./MemberLayout";
-import { getMyProfile } from "@/services/api";
+import { getMyProfile, getMemberClaims } from "@/services/api";
 import {
     Shield,
     MapPin,
@@ -10,20 +10,26 @@ import {
     Clock,
     ArrowRight,
     DollarSign,
-    FileText
+    FileText,
+    History
 } from "lucide-react";
 
 const Dashboard = () => {
     const [profile, setProfile] = useState<any>(null);
+    const [claims, setClaims] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchProfile = async () => {
+        const fetchData = async () => {
             try {
-                const data = await getMyProfile();
-                setProfile(data);
+                const [profileData, claimsData] = await Promise.all([
+                    getMyProfile(),
+                    getMemberClaims()
+                ]);
+                setProfile(profileData);
+                setClaims(claimsData.slice(0, 3)); // Show top 3 recent
             } catch (error) {
-                console.error("Error fetching profile:", error);
+                console.error("Error fetching dashboard data:", error);
                 if (error instanceof Error && error.message.includes('401')) {
                     window.location.href = '/login';
                 }
@@ -31,7 +37,7 @@ const Dashboard = () => {
                 setLoading(false);
             }
         };
-        fetchProfile();
+        fetchData();
     }, []);
 
     if (loading) return (
@@ -52,6 +58,20 @@ const Dashboard = () => {
         : { incidentLimit: "$1,000", claimsPerYear: "2 claims/year", serviceFee: "$99 per visit" };
 
     const coverageStarted = profile.waitingPeriodEnd && new Date(profile.waitingPeriodEnd) < new Date();
+
+    const formatStatus = (status: string) => {
+        return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'new': return 'bg-blue-50 text-blue-700 border-blue-100';
+            case 'under_review': return 'bg-amber-50 text-amber-700 border-amber-100';
+            case 'approved': return 'bg-green-50 text-green-700 border-green-100';
+            case 'denied': return 'bg-red-50 text-red-700 border-red-100';
+            default: return 'bg-slate-50 text-slate-700 border-slate-100';
+        }
+    };
 
     return (
         <MemberLayout>
@@ -117,6 +137,31 @@ const Dashboard = () => {
                             </p>
                         </div>
                     </div>
+                )}
+
+                {/* Recent Claims Section */}
+                {claims.length > 0 && (
+                    <section className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <History className="h-5 w-5 text-slate-400" />
+                                <h3 className="font-bold text-slate-900">Recent Claims</h3>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100">
+                            {claims.map((claim) => (
+                                <div key={claim.claimId} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                    <div>
+                                        <p className="font-bold text-slate-900 text-sm">{claim.issueType}</p>
+                                        <p className="text-[10px] text-slate-500 mt-0.5">Submitted on {new Date(claim.createdAt).toLocaleDateString()}</p>
+                                    </div>
+                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(claim.status)}`}>
+                                        {formatStatus(claim.status)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
                 )}
 
                 {/* Action Cards Row */}
