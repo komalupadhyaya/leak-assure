@@ -86,10 +86,11 @@ exports.startSignup = async (req, res) => {
             plan,
             smsOptIn,
             password: hashedPassword,
+            role: 'member', // Force role to member
             forcePasswordChange: false,
             stripeCustomerId,
             subscriptionStatus: 'pending',
-            waitingPeriodEnd,
+            waitingPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             createdAt,
         });
 

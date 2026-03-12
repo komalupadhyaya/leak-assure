@@ -65,12 +65,12 @@ exports.getAllMembers = async (req, res) => {
         const limit = parseInt(req.query.limit) || 25;
         const skip = (page - 1) * limit;
 
-        const members = await User.find()
+        const members = await User.find({ role: 'member' })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
 
-        const totalRecords = await User.countDocuments();
+        const totalRecords = await User.countDocuments({ role: 'member' });
         const totalPages = Math.ceil(totalRecords / limit);
 
         res.json({
@@ -87,7 +87,7 @@ exports.getAllMembers = async (req, res) => {
 
 exports.getMemberById = async (req, res) => {
     try {
-        const member = await User.findById(req.params.id);
+        const member = await User.findOne({ _id: req.params.id, role: 'member' });
         if (!member) return res.status(404).json({ error: 'Member not found' });
         res.json(member);
     } catch (error) {
@@ -98,7 +98,11 @@ exports.getMemberById = async (req, res) => {
 
 exports.updateMember = async (req, res) => {
     try {
-        const member = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const member = await User.findOneAndUpdate(
+            { _id: req.params.id, role: 'member' },
+            req.body,
+            { new: true }
+        );
         if (!member) return res.status(404).json({ error: 'Member not found' });
 
         await AuditLog.create({
@@ -118,7 +122,7 @@ exports.updateMember = async (req, res) => {
 
 exports.cancelSubscription = async (req, res) => {
     try {
-        const member = await User.findById(req.params.id);
+        const member = await User.findOne({ _id: req.params.id, role: 'member' });
         if (!member) return res.status(404).json({ error: 'Member not found' });
 
         if (member.stripeSubscriptionId) {
@@ -151,9 +155,7 @@ exports.cancelSubscription = async (req, res) => {
 exports.addMemberNote = async (req, res) => {
     try {
         const { note } = req.body;
-        // Assuming User model has a notes array, if not we ignore or add it later.
-        // For now, let's just use it if it exists.
-        const member = await User.findById(req.params.id);
+        const member = await User.findOne({ _id: req.params.id, role: 'member' });
         if (!member) return res.status(404).json({ error: 'Member not found' });
 
         // We'll add notes handling to User model if needed, but the prompt asked for this function.

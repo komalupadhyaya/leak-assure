@@ -1,7 +1,17 @@
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient;
+const getResendClient = () => {
+    if (!resendClient) {
+        if (!process.env.RESEND_API_KEY) {
+            console.error("CRITICAL: RESEND_API_KEY is missing from environment.");
+            throw new Error("RESEND_API_KEY is not configured.");
+        }
+        resendClient = new Resend(process.env.RESEND_API_KEY);
+    }
+    return resendClient;
+};
 
 // For production, use real SMTP credentials.
 // For testing, this will log to console if variables are missing.
@@ -98,40 +108,145 @@ For security, please change your password after logging in.`;
 
 exports.sendEnrollmentConfirmationEmail = async (user) => {
     try {
-        console.log("Sending enrollment confirmation email to:", user.email);
+        const isProduction = process.env.NODE_ENV === 'production';
+        const adminEmail = process.env.EMAIL_RECEIVER || "komalsoftiatric@gmail.com";
+        const portalUrl = process.env.MEMBER_PORTAL || "http://localhost:8080/login";
+
+        console.log("Preparing enrollment confirmation email for:", user.email);
+
+        const planDetails = user.plan === 'premium' ? {
+            name: 'Premium Protection',
+            price: '$49/month',
+            limit: '$2,000 per incident',
+            claims: 'Maximum 3 claims per year',
+            fee: '$49 service fee per claim'
+        } : {
+            name: 'Essential Protection',
+            price: '$29/month',
+            limit: '$1,000 per incident',
+            claims: 'Maximum 2 claims per year',
+            fee: '$99 service fee per claim'
+        };
 
         const html = `
-            <h2>Your Leak Assure Protection Plan is Active</h2>
-            <p>Hello ${user.fullName},</p>
-            <p>Thank you for enrolling in Leak Assure.</p>
-            <p>Your protection plan has been successfully activated.</p>
-            <h3>Coverage Summary</h3>
-            <ul>
-                <li><strong>Plan:</strong> ${user.plan === 'premium' ? 'Premium Plan' : 'Essential Plan'}</li>
-                <li><strong>Service Address:</strong> ${user.serviceAddress}</li>
-                <li><strong>Monthly Price:</strong> $${user.planPrice || (user.plan === 'premium' ? 49 : 29)}</li>
-                <li><strong>Coverage Start Date:</strong> ${user.waitingPeriodEnd ? new Date(user.waitingPeriodEnd).toLocaleDateString() : '30 days from today'}</li>
-            </ul>
-            <p><strong>Important Notice</strong></p>
-            <p>Your coverage begins after the 30-day waiting period.</p>
-            <p>Keep this email for your records.</p>
-            <p>You can access your account using the Member Portal.</p>
-            <p>Thank you for choosing Leak Assure.</p>
-`;
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; }
+                    .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #f0f4f8; }
+                    .badge { display: inline-block; background-color: #e6fffa; color: #2c7a7b; padding: 8px 16px; border-radius: 9999px; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
+                    .hero-text { font-size: 24px; font-weight: bold; color: #1a202c; margin-bottom: 10px; }
+                    .section { margin: 25px 0; }
+                    .details-box { background-color: #f7fafc; border: 1px solid #edf2f7; border-radius: 8px; padding: 20px; }
+                    .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+                    .detail-label { color: #718096; }
+                    .detail-value { font-weight: 600; color: #2d3748; }
+                    .coverage-box { background-color: #ebf8ff; border-left: 4px solid #4299e1; padding: 15px; margin: 20px 0; }
+                    .coverage-title { font-weight: bold; color: #2b6cb0; margin-bottom: 5px; }
+                    .coverage-list { margin: 0; padding-left: 20px; font-size: 14px; }
+                    .button { display: block; width: 220px; margin: 30px auto; background-color: #2b6cb0; color: #ffffff !important; text-align: center; padding: 14px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+                    .notice { font-size: 13px; color: #718096; font-style: italic; text-align: center; }
+                    .footer { font-size: 11px; color: #a0aec0; text-align: center; margin-top: 40px; border-top: 1px solid #edf2f7; padding-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="badge">✓ ACTIVATED</div>
+                        <div class="hero-text">You're Covered</div>
+                        <p style="color: #4a5568;">Your Leak Assure protection plan has been successfully activated.</p>
+                    </div>
 
-        const { data, error } = await resend.emails.send({
-            from: process.env.EMAIL_FROM || 'noreply@leakassure.com',
-            to: user.email,
-            subject: "Your Leak Assure Protection Plan is Active",
-            html: html
-        });
+                    <div class="section">
+                        <div class="details-box">
+                            <div class="detail-row">
+                                <span class="detail-label">Full Name:</span>
+                                <span class="detail-value">${user.fullName}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Service Address:</span>
+                                <span class="detail-value">${user.serviceAddress}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Selected Plan:</span>
+                                <span class="detail-value">${planDetails.name}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Monthly Price:</span>
+                                <span class="detail-value">${planDetails.price}/month</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Effective Date:</span>
+                                <span class="detail-value">${user.activatedAt ? new Date(user.activatedAt).toLocaleDateString() : 'Immediate'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="coverage-box">
+                        <div class="coverage-title">${planDetails.name} Summary</div>
+                        <ul class="coverage-list">
+                            <li>${planDetails.limit} coverage per incident</li>
+                            <li>${planDetails.claims}</li>
+                            <li>${planDetails.fee} per claim</li>
+                        </ul>
+                    </div>
+
+                    <div class="section" style="text-align: center;">
+                        <p style="font-weight: bold; color: #e53e3e;">Waiting Period Notice</p>
+                        <p style="font-size: 14px; color: #718096;">Coverage begins after the 30-day waiting period (${user.waitingPeriodEnd ? new Date(user.waitingPeriodEnd).toLocaleDateString() : 'N/A'}).</p>
+                    </div>
+
+                    <div class="section">
+                        <p style="font-weight: bold; color: #2d3748;">What happens next?</p>
+                        <ul style="font-size: 14px; color: #4a5568; line-height: 1.6;">
+                            <li>Check your email for confirmation</li>
+                            <li>Save your coverage details for your records</li>
+                            <li>Use the Member Portal to file claims</li>
+                        </ul>
+                    </div>
+
+                    <a href="${portalUrl}" class="button">Access Member Portal</a>
+
+                    <div class="footer">
+                        <p><strong>THIS IS A SERVICE CONTRACT. THIS IS NOT INSURANCE.</strong></p>
+                        <p>Coverage is subject to the Leak Assure Service Contract Policy and plan limitations.</p>
+                        <p>&copy; ${new Date().getFullYear()} Leak Assure. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const resend = getResendClient();
+
+        let mailOptions;
+        if (isProduction) {
+            mailOptions = {
+                from: process.env.EMAIL_FROM || 'noreply@leakassure.com',
+                to: user.email,
+                bcc: adminEmail,
+                subject: "You're Covered: Leak Assure Enrollment Confirmation",
+                html: html
+            };
+        } else {
+            mailOptions = {
+                from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+                to: [user.email, adminEmail],
+                subject: "[DEV] You're Covered: Leak Assure Enrollment Confirmation",
+                html: html
+            };
+        }
+
+        const { data, error } = await resend.emails.send(mailOptions);
 
         if (error) {
             console.error("RESEND ERROR:", error);
             throw new Error(`Email delivery failed: ${error.message}`);
         }
 
-        console.log("Confirmation email sent successfully:", data.id);
+        console.log("Enrollment confirmation email sent to:", user.email);
+        console.log("Monitoring copy sent to:", adminEmail);
         return data;
 
     } catch (err) {

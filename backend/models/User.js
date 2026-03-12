@@ -16,17 +16,17 @@ const UserSchema = new mongoose.Schema({
     },
     phone: {
         type: String,
-        required: true,
+        required: function () { return this.role === 'member'; },
         trim: true,
     },
     serviceAddress: {
         type: String,
-        required: true,
+        required: function () { return this.role === 'member'; },
         trim: true,
     },
     plan: {
         type: String,
-        required: true,
+        required: function () { return this.role === 'member'; },
         enum: ['essential', 'premium'],
     },
     smsOptIn: {
@@ -45,7 +45,7 @@ const UserSchema = new mongoose.Schema({
     subscriptionStatus: {
         type: String,
         enum: ['pending', 'active', 'canceled'],
-        default: 'active',
+        default: function () { return this.role === 'member' ? 'pending' : undefined; },
     },
     planPrice: {
         type: Number,
