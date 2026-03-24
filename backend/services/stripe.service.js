@@ -17,8 +17,8 @@ const createCheckoutSession = async (customerData, priceId) => {
             },
         ],
         // Correct URL construction with environment variables
-        success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL}/cancel`, // Using /cancel to show message
+        success_url: `${process.env.FRONTEND_SIGNUP_URL || 'https://signup.leakassure.com'}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_SIGNUP_URL || 'https://signup.leakassure.com'}/cancel`, // Using /cancel to show message
     });
 
     return session;

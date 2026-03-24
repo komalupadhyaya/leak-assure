@@ -108,8 +108,8 @@ exports.startSignup = async (req, res) => {
                     quantity: 1,
                 },
             ],
-            success_url: `${process.env.FRONTEND_URL}/welcome?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.FRONTEND_URL}/`,
+            success_url: `${process.env.FRONTEND_SIGNUP_URL || 'https://signup.leakassure.com'}/welcome?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.FRONTEND_SIGNUP_URL || 'https://signup.leakassure.com'}/`,
             metadata: {
                 email: email,
                 plan: plan,

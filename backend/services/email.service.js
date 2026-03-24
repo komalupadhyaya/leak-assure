@@ -72,7 +72,7 @@ exports.sendCancellationNotice = (email, name) => {
 
 exports.sendLoginCredentials = (email, name, tempPassword) => {
     const subject = 'Welcome to Leak Assure — Your Account is Ready';
-    const loginUrl = `${process.env.FRONTEND_URL}/login`;
+    const loginUrl = `${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}/login`;
     const text = `Hello ${name},
 
 Your Leak Assure protection plan has been activated.
@@ -109,7 +109,7 @@ For security, please change your password after logging in.`;
 exports.sendEnrollmentConfirmationEmail = async (user) => {
     const isProduction = process.env.APP_ENV === 'production';
     const adminEmail = process.env.EMAIL_RECEIVER || "komalsoftiatric@gmail.com";
-    const portalUrl = process.env.MEMBER_PORTAL || "http://localhost:8080/login";
+    const portalUrl = process.env.MEMBER_PORTAL || `${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}/login`;
     const fromEmail = process.env.EMAIL_FROM || (isProduction ? 'noreply@leakassure.com' : 'onboarding@resend.dev');
 
     try {

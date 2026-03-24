@@ -266,7 +266,7 @@ exports.createBillingPortal = async (req, res) => {
 
         const session = await stripe.billingPortal.sessions.create({
             customer: user.stripeCustomerId,
-            return_url: `${process.env.FRONTEND_URL}/member/settings`,
+            return_url: `${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}/member/settings`,
         });
 
         console.log("Billing portal session created for:", user.email);

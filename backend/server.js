@@ -34,9 +34,10 @@ const app = express();
 app.use(morgan('combined'));
 app.use(cors({
     origin: [
-        'https://leakassure.com',
-        'https://www.leakassure.com',
-        process.env.FRONTEND_URL || 'http://localhost:8080'
+        'https://admin.leakassure.com',
+        'https://signup.leakassure.com',
+        'https://member.leakassure.com',
+        ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:8080'])
     ],
     credentials: true
 }));
