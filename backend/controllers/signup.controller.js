@@ -1,6 +1,9 @@
 const { z } = require('zod');
 const Stripe = require('stripe');
 const User = require('../models/User');
+const Affiliate = require('../models/Affiliate');
+const Referral = require('../models/Referral');
+const Commission = require('../models/Commission');
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
@@ -96,6 +99,26 @@ exports.startSignup = async (req, res) => {
 
         await user.save();
         console.log('User record saved with pending status:', user._id);
+
+        // --- REFERRAL TRACKING ---
+        const refCode = req.body.ref || (req.cookies && req.cookies.la_ref);
+        if (refCode) {
+            try {
+                const affiliate = await Affiliate.findOne({ referralCode: refCode, status: 'approved' });
+                if (affiliate) {
+                    const referral = new Referral({
+                        affiliateId: affiliate._id,
+                        referredUserId: user._id,
+                        referredEmail: user.email,
+                        convertedAt: null, // To be set on successful payment
+                    });
+                    await referral.save();
+                    console.log(`[Referral] Created pending referral for affiliate: ${affiliate.email}`);
+                }
+            } catch (refErr) {
+                console.error('[Referral] Failed to create referral record:', refErr.message);
+            }
+        }
 
         // 5. Create Stripe Checkout Session
         const session = await stripe.checkout.sessions.create({

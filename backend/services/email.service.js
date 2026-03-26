@@ -118,13 +118,11 @@ exports.sendEnrollmentConfirmationEmail = async (user) => {
         const planDetails = user.plan === 'premium' ? {
             name: 'Premium Protection',
             price: '$49/month',
-            limit: '$2,000 per incident',
-            claims: 'Maximum 3 claims per year',
-            fee: '$49 service fee per claim'
+            claims: 'Maximum 2 claims per year',
+            fee: '$125 service fee per claim'
         } : {
             name: 'Essential Protection',
             price: '$29/month',
-            limit: '$1,000 per incident',
             claims: 'Maximum 2 claims per year',
             fee: '$99 service fee per claim'
         };
@@ -192,9 +190,8 @@ exports.sendEnrollmentConfirmationEmail = async (user) => {
                     <div class="coverage-box">
                         <div class="coverage-title">${planDetails.name} Summary</div>
                         <ul class="coverage-list">
-                            <li>${planDetails.limit} coverage per incident</li>
                             <li>${planDetails.claims}</li>
-                            <li>${planDetails.fee} per claim</li>
+                            <li>${planDetails.fee}</li>
                         </ul>
                     </div>
 

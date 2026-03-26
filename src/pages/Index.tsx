@@ -1,5 +1,6 @@
 import { Droplets } from "lucide-react";
 import SignupForm from "@/components/SignupForm";
+import AffiliateLogin from "./affiliate/AffiliateLogin";
 
 const Index = () => {
   return (
@@ -32,6 +33,18 @@ const Index = () => {
           </div>
 
           <SignupForm />
+
+          <div className="mt-2 pt-2 border-t border-slate-50 text-center">
+            <p className="text-sm text-slate-500 font-medium">
+              Already have an account?{" "}
+              <a
+                href="https://member.leakassure.com/login"
+                className="text-blue-600 font-bold hover:underline underline-offset-4"
+              >
+                Sign In
+              </a>
+            </p>
+          </div>
         </div>
 
         {/* Trust Footer */}

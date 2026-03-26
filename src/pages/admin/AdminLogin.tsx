@@ -33,7 +33,7 @@ const AdminLogin = () => {
                     <div className="inline-flex items-center justify-center p-4 bg-slate-800 rounded-3xl shadow-2xl shadow-blue-500/10 mb-6 border border-slate-700">
                         <Shield className="h-10 w-10 text-blue-400" />
                     </div>
-                    <h1 className="text-3xl font-bold">Admin Registry</h1>
+                    <h1 className="text-3xl font-bold">Admin Login</h1>
                     <p className="text-slate-400 mt-2 italic text-sm">Leak Assure Control Panel</p>
                 </div>
 

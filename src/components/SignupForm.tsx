@@ -37,26 +37,21 @@ function CoverageTermsModal({ onClose }: { onClose: () => void }) {
                         eligible for coverage.
                     </p>
                     <p>
-                        <strong>3. Coverage Limits.</strong> Total coverage is subject to the limits specified in
-                        your selected plan. Essential Protection covers up to $1,000 per incident; Premium
-                        Protection covers up to $2,000 per incident.
-                    </p>
-                    <p>
-                        <strong>4. Exclusions.</strong> Coverage does not apply to pre-existing conditions, gradual
+                        <strong>3. Exclusions.</strong> Coverage does not apply to pre-existing conditions, gradual
                         leaks, storm damage, negligence, or damage caused by the homeowner's modifications to the
                         plumbing system.
                     </p>
                     <p>
-                        <strong>5. Claims Process.</strong> To file a claim, contact Leak Assure support within
+                        <strong>4. Claims Process.</strong> To file a claim, contact Leak Assure support within
                         48 hours of discovering damage. A licensed plumber approved by Leak Assure must assess
                         the damage before repairs begin.
                     </p>
                     <p>
-                        <strong>6. Service Fees.</strong> A service fee applies to each claim visit: $99 for Essential
-                        Protection and $49 for Premium Protection.
+                        <strong>5. Service Fees.</strong> A service fee applies to each claim visit: $99 for Essential
+                        Protection and $125 for Premium Protection.
                     </p>
                     <p>
-                        <strong>7. Cancellation.</strong> You may cancel your subscription at any time. Coverage
+                        <strong>6. Cancellation.</strong> You may cancel your subscription at any time. Coverage
                         remains active through the end of the current billing period.
                     </p>
                 </div>
@@ -117,17 +112,15 @@ const PLANS = [
         value: "essential",
         label: "Essential Protection",
         price: 29,
-        limit: "$1,000",
-        claims: "2 claims/year",
-        fee: "$99 fee"
+        claims: "2 claims per year",
+        fee: "$125 per claim"
     },
     {
         value: "premium",
         label: "Premium Protection",
         price: 49,
-        limit: "$2,000",
-        claims: "3 claims/year",
-        fee: "$49 fee"
+        claims: "2 claims per year",
+        fee: "$125 per claim"
     },
 ] as const;
 
@@ -339,15 +332,11 @@ export function SignupForm() {
                                     <ul className="space-y-2">
                                         <li className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
                                             <div className={`h-1 w-1 rounded-full ${isSelected ? 'bg-blue-400' : 'bg-slate-300'}`} />
-                                            {p.limit} limit per incident
-                                        </li>
-                                        <li className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-                                            <div className={`h-1 w-1 rounded-full ${isSelected ? 'bg-blue-400' : 'bg-slate-300'}`} />
                                             {p.claims}
                                         </li>
                                         <li className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
                                             <div className={`h-1 w-1 rounded-full ${isSelected ? 'bg-blue-400' : 'bg-slate-300'}`} />
-                                            {p.fee} service visit fee
+                                            {p.fee} (Service fee)
                                         </li>
                                     </ul>
                                 </button>

@@ -54,8 +54,8 @@ const Dashboard = () => {
     const isActive = profile.subscriptionStatus === 'active';
 
     const planDetails = isPremium
-        ? { incidentLimit: "$2,000", claimsPerYear: "3 claims/year", serviceFee: "$49 per visit" }
-        : { incidentLimit: "$1,000", claimsPerYear: "2 claims/year", serviceFee: "$99 per visit" };
+        ? { claimsPerYear: "2 claims per year", serviceFee: "$125 per claim" }
+        : { claimsPerYear: "2 claims per year", serviceFee: "$125 per claim" };
 
     const coverageStarted = profile.waitingPeriodEnd && new Date(profile.waitingPeriodEnd) < new Date();
 
@@ -103,20 +103,16 @@ const Dashboard = () => {
                     </div>
 
                     {/* Plan Details Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 border-t md:border-t-0 border-slate-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 border-t md:border-t-0 border-slate-100">
                         <div className="p-5">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monthly Cost</p>
                             <p className="text-xl font-bold text-slate-900">${profile.planPrice || (isPremium ? 49 : 29)}</p>
                         </div>
-                        <div className="p-5 sm:border-l sm:border-slate-100 md:border-l-0">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Incident Limit</p>
-                            <p className="text-xl font-bold text-slate-900">{planDetails.incidentLimit}</p>
-                        </div>
-                        <div className="p-5">
+                        <div className="p-5 sm:border-l sm:border-slate-100">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Claims Per Year</p>
                             <p className="text-xl font-bold text-slate-900">{planDetails.claimsPerYear}</p>
                         </div>
-                        <div className="p-5 sm:border-l sm:border-slate-100 md:border-l-0">
+                        <div className="p-5 sm:border-l sm:border-slate-100">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Service Fee</p>
                             <p className="text-xl font-bold text-slate-900">{planDetails.serviceFee}</p>
                         </div>
@@ -196,10 +192,14 @@ const Dashboard = () => {
                         </div>
                         <ul className="space-y-2.5">
                             {[
-                                "Internal Plumbing Protection",
-                                "Sewer & Drainage Line Coverage",
-                                "Emergency Response (2-4 hours)",
-                                isPremium ? "Annual Maintenance Inspection" : "Priority Scheduling"
+                                "Interior Plumbing Leak Protection",
+                                "Drain & Toilet Clog Removal",
+                                "Appliance Water Line Leaks",
+                                "Water Heater Connection Leaks",
+                                "Plumbing Leaks Behind Walls",
+                                "Ceiling Leak Sources (Plumbing Only)",
+                                "Shutoff Valve Failures",
+                                "Limited Drywall Access & Patch Repair"
                             ].map((feature, i) => (
                                 <li key={i} className="flex items-center gap-2 text-sm text-slate-700">
                                     <div className="h-5 w-5 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">

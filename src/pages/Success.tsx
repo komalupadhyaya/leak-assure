@@ -46,14 +46,12 @@ const Success = () => {
 
   const planRules = {
     essential: {
-      limit: "$1,000 per incident",
       claims: "2 claims per year",
-      fee: "$99 per visit"
+      fee: "$125 per claim"
     },
     premium: {
-      limit: "$2,000 per incident",
-      claims: "3 claims per year",
-      fee: "$49 per visit"
+      claims: "2 claims per year",
+      fee: "$125 per claim"
     }
   };
 
@@ -109,10 +107,6 @@ const Success = () => {
                 <div>
                   <p className="text-gray-500 text-xs uppercase font-bold tracking-wider mb-1">Effective Date</p>
                   <p className="text-gray-900 font-semibold">{new Date().toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-xs uppercase font-bold tracking-wider mb-1">Incident Limit</p>
-                  <p className="text-gray-900 font-semibold">{currentPlan.limit}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs uppercase font-bold tracking-wider mb-1">Claims Per Year</p>

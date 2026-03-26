@@ -102,6 +102,29 @@ exports.handleWebhook = async (req, res) => {
             await user.save();
             console.log("User successfully activated via webhook:", user.email);
 
+            // --- AFFILIATE CONVERSION & COMMISSION ---
+            const Referral = require('../models/Referral');
+            const Commission = require('../models/Commission');
+            try {
+                const referral = await Referral.findOne({ referredUserId: user._id, convertedAt: null });
+                if (referral) {
+                    referral.convertedAt = new Date();
+                    await referral.save();
+
+                    const commissionAmount = parseInt(process.env.AFFILIATE_COMMISSION_AMOUNT || '20', 10);
+                    const commission = new Commission({
+                        affiliateId: referral.affiliateId,
+                        referralId: referral._id,
+                        amount: commissionAmount,
+                        status: 'pending',
+                    });
+                    await commission.save();
+                    console.log(`[Webhook] Created commission for affiliate ${referral.affiliateId} for user ${user.email}`);
+                }
+            } catch (refErr) {
+                console.error('[Webhook] Failed to process referral conversion:', refErr.message);
+            }
+
             const emailService = require('../services/email.service');
 
             // --- SEND ENROLLMENT CONFIRMATION EMAIL (RESEND) ---

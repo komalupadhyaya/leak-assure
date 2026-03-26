@@ -22,6 +22,16 @@ import MemberDashboard from "./pages/member/Dashboard";
 import FileClaim from "./pages/member/FileClaim";
 import MemberSettings from "./pages/member/Settings";
 import ChangePassword from "./pages/member/ChangePassword";
+import AdminAffiliates from "./pages/admin/Affiliates";
+
+// Affiliate Portal
+import AffiliateLogin from "./pages/affiliate/AffiliateLogin";
+import AffiliateSignup from "./pages/affiliate/AffiliateSignup";
+import AffiliateDashboard from "./pages/affiliate/AffiliateDashboard";
+import AffiliateReferrals from "./pages/affiliate/AffiliateReferrals";
+import AffiliateCommissions from "./pages/affiliate/AffiliateCommissions";
+import AffiliateCreatives from "./pages/affiliate/AffiliateCreatives";
+import AffiliateSettings from "./pages/affiliate/AffiliateSettings";
 
 import { Navigate } from "react-router-dom";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -53,7 +63,30 @@ const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode,
   return <>{children}</>;
 };
 
+// Affiliate Auth Guard
+const AffiliateProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = localStorage.getItem('affiliate_token');
+  if (!token) return <Navigate to="/affiliate/login" replace />;
+  return <>{children}</>;
+};
+
 const queryClient = new QueryClient();
+
+const DomainRouter = () => {
+  const hostname = window.location.hostname;
+  
+  if (hostname.includes('affiliates.')) {
+    return <Navigate to="/affiliate/login" replace />;
+  }
+  if (hostname.includes('member.')) {
+    return <Navigate to="/login" replace />;
+  }
+  if (hostname.includes('admin.')) {
+    return <Navigate to="/admin/login" replace />;
+  }
+  
+  return <Index />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -62,7 +95,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<DomainRouter />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/success" element={<Success />} />
@@ -78,7 +111,7 @@ const App = () => (
           <Route path="/admin/claims/:id" element={<ProtectedRoute requiredRole="admin"><ClaimDetail /></ProtectedRoute>} />
           <Route path="/admin/payments" element={<ProtectedRoute requiredRole="admin"><Payments /></ProtectedRoute>} />
           <Route path="/admin/vendors" element={<ProtectedRoute requiredRole="admin"><Vendors /></ProtectedRoute>} />
-          <Route path="/admin/affiliates" element={<ProtectedRoute requiredRole="admin"><Affiliates /></ProtectedRoute>} />
+          <Route path="/admin/affiliates" element={<ProtectedRoute requiredRole="admin"><AdminAffiliates /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminSettings /></ProtectedRoute>} />
 
           {/* Phase 4 Member Routes (Protected) */}
@@ -86,6 +119,16 @@ const App = () => (
           <Route path="/member/file-claim" element={<ProtectedRoute requiredRole="member"><FileClaim /></ProtectedRoute>} />
           <Route path="/member/settings" element={<ProtectedRoute requiredRole="member"><MemberSettings /></ProtectedRoute>} />
           <Route path="/member/change-password" element={<ProtectedRoute requiredRole="member"><ChangePassword /></ProtectedRoute>} />
+
+          {/* Affiliate Portal Routes */}
+          <Route path="/affiliate" element={<Navigate to="/affiliate/login" replace />} />
+          <Route path="/affiliate/login" element={<AffiliateLogin />} />
+          <Route path="/affiliate/signup" element={<AffiliateSignup />} />
+          <Route path="/affiliate/dashboard" element={<AffiliateProtectedRoute><AffiliateDashboard /></AffiliateProtectedRoute>} />
+          <Route path="/affiliate/referrals" element={<AffiliateProtectedRoute><AffiliateReferrals /></AffiliateProtectedRoute>} />
+          <Route path="/affiliate/commissions" element={<AffiliateProtectedRoute><AffiliateCommissions /></AffiliateProtectedRoute>} />
+          <Route path="/affiliate/marketing" element={<AffiliateProtectedRoute><AffiliateCreatives /></AffiliateProtectedRoute>} />
+          <Route path="/affiliate/settings" element={<AffiliateProtectedRoute><AffiliateSettings /></AffiliateProtectedRoute>} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

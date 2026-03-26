@@ -43,10 +43,6 @@ const ClaimSchema = new mongoose.Schema({
     notes: [{
         type: String
     }],
-    incidentLimit: {
-        type: Number,
-        required: true
-    },
     serviceFee: {
         type: Number,
         required: true

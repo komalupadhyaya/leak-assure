@@ -61,10 +61,14 @@ const FileClaim = () => {
                                 required
                             >
                                 <option value="">Select an issue type...</option>
-                                <option value="Burst Pipe">Burst Pipe</option>
-                                <option value="Severe Leak">Severe Leak</option>
-                                <option value="Clogged Drain">Clogged Drain / Sewer Backup</option>
-                                <option value="Water Heater Issue">Water Heater Issue</option>
+                                <option value="Interior Plumbing Leak Protection">Interior Plumbing Leak Protection</option>
+                                <option value="Drain & Toilet Clog Removal">Drain & Toilet Clog Removal</option>
+                                <option value="Appliance Water Line Leaks">Appliance Water Line Leaks</option>
+                                <option value="Water Heater Connection Leaks">Water Heater Connection Leaks</option>
+                                <option value="Plumbing Leaks Behind Walls">Plumbing Leaks Behind Walls</option>
+                                <option value="Ceiling Leak Sources (Plumbing Only)">Ceiling Leak Sources (Plumbing Only)</option>
+                                <option value="Shutoff Valve Failures">Shutoff Valve Failures</option>
+                                <option value="Limited Drywall Access & Patch Repair">Limited Drywall Access & Patch Repair</option>
                                 <option value="Other">Other Emergency</option>
                             </select>
                         </div>

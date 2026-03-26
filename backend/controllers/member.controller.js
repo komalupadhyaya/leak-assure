@@ -63,7 +63,7 @@ exports.memberFileClaim = async (req, res) => {
             createdAt: { $gte: startOfYear, $lte: endOfYear }
         });
 
-        const allowedClaims = user.plan === 'premium' ? 3 : 2;
+        const allowedClaims = user.plan === 'premium' ? 2 : 2;
 
         if (claimsThisYear >= allowedClaims) {
             console.log(`Claim rejection: Yearly limit reached for ${user.email} (${user.plan})`);
@@ -73,8 +73,7 @@ exports.memberFileClaim = async (req, res) => {
         }
 
         // --- RULE 5: PLAN DETAILS ENRICHMENT ---
-        const incidentLimit = user.plan === 'premium' ? 2000 : 1000;
-        const serviceFee = user.plan === 'premium' ? 49 : 99;
+        const serviceFee = user.plan === 'premium' ? 125 : 99;
 
         console.log(`Attempting to send email for claim by: ${user.email}`);
 
@@ -84,7 +83,6 @@ exports.memberFileClaim = async (req, res) => {
             memberName: user.fullName,
             serviceAddress: user.serviceAddress,
             status: 'new',
-            incidentLimit,
             serviceFee,
             planType: user.plan
         });
