@@ -74,17 +74,22 @@ const queryClient = new QueryClient();
 
 const DomainRouter = () => {
   const hostname = window.location.hostname;
-  
-  if (hostname.includes('affiliates.')) {
+
+  // Only redirect if we are at the root path
+  if (window.location.pathname !== '/') {
+    return <Index />;
+  }
+
+  if (hostname.startsWith('affiliates.')) {
     return <Navigate to="/affiliate/login" replace />;
   }
-  if (hostname.includes('member.')) {
+  if (hostname.startsWith('member.')) {
     return <Navigate to="/login" replace />;
   }
-  if (hostname.includes('admin.')) {
+  if (hostname.startsWith('admin.')) {
     return <Navigate to="/admin/login" replace />;
   }
-  
+
   return <Index />;
 };
 

@@ -13,7 +13,7 @@ exports.login = async (req, res) => {
 
         if (!user) {
             return res.status(401).json({ error: 'Invalid email or password' });
-        }``
+        }
 
         // 2. Verify role is admin
         if (user.role !== 'admin') {

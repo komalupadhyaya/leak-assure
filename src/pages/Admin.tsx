@@ -93,7 +93,8 @@ const Admin = () => {
                 type="button"
                 variant="ghost"
                 className="w-full text-muted-foreground hover:text-foreground"
-                onClick={() => window.location.href = "/"}
+                // onClick={() => window.location.href = "/"}
+                onClick={() => window.location.href = "https://signup.leakassure.com"}
               >
                 Return to Home
               </Button>
@@ -110,7 +111,8 @@ const Admin = () => {
               <Droplets className="h-6 w-6 text-primary" />
               <span className="text-lg font-bold text-foreground">Leak Assure Admin</span>
             </div>
-            <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            {/* <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors"> */}
+            <a href="https://signup.leakassure.com" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Back to Site
             </a>
           </nav>
