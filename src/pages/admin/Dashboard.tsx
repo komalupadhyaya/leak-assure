@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "./AdminLayout";
-import { getDashboardStats } from "@/services/api";
+import { getDashboardStats, createAdminUser } from "@/services/api";
+import { toast } from "sonner";
 import {
     Users,
     FileText,
@@ -29,6 +30,9 @@ interface Stats {
 const Dashboard = () => {
     const [stats, setStats] = useState<Stats | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showAdminModal, setShowAdminModal] = useState(false);
+    const [adminForm, setAdminForm] = useState({ fullName: "", email: "", password: "" });
+    const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -43,6 +47,21 @@ const Dashboard = () => {
         };
         fetchStats();
     }, []);
+
+    const handleCreateAdmin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsCreatingAdmin(true);
+        try {
+            await createAdminUser(adminForm);
+            toast.success(`Admin user ${adminForm.email} created successfully!`);
+            setShowAdminModal(false);
+            setAdminForm({ fullName: "", email: "", password: "" });
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to create admin user');
+        } finally {
+            setIsCreatingAdmin(false);
+        }
+    };
 
     const cards = [
         {
@@ -114,9 +133,17 @@ const Dashboard = () => {
     return (
         <AdminLayout>
             <div className="space-y-8">
-                <div>
-                    <h2 className="text-xl font-bold text-slate-900 mb-1">Dashboard</h2>
-                    <p className="text-sm text-slate-500">Real-time overview of your Leak Assure platform.</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 mb-1">Dashboard</h2>
+                        <p className="text-sm text-slate-500">Real-time overview of your Leak Assure platform.</p>
+                    </div>
+                    <button
+                        onClick={() => setShowAdminModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-colors"
+                    >
+                        + Create Admin User
+                    </button>
                 </div>
 
                 {loading ? (
@@ -198,6 +225,24 @@ const Dashboard = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Create Admin User Modal */}
+            {showAdminModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+                        <h2 className="text-lg font-bold text-slate-900 mb-6">Create Admin User</h2>
+                        <form onSubmit={handleCreateAdmin} className="space-y-4">
+                            <input type="text" placeholder="Full Name" required value={adminForm.fullName} onChange={e => setAdminForm(f => ({...f, fullName: e.target.value}))} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 transition-all" />
+                            <input type="email" placeholder="Email Address" required value={adminForm.email} onChange={e => setAdminForm(f => ({...f, email: e.target.value}))} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 transition-all" />
+                            <input type="password" placeholder="Password (min. 8 chars)" required minLength={8} value={adminForm.password} onChange={e => setAdminForm(f => ({...f, password: e.target.value}))} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 transition-all" />
+                            <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={() => setShowAdminModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50">Cancel</button>
+                                <button type="submit" disabled={isCreatingAdmin} className="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50">{isCreatingAdmin ? 'Creating...' : 'Create Admin'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     );
 };

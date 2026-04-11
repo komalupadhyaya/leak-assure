@@ -4,14 +4,18 @@ const User = require('../models/User');
 const Affiliate = require('../models/Affiliate');
 const Referral = require('../models/Referral');
 const Commission = require('../models/Commission');
+const bcrypt = require('bcryptjs');
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
 });
 
+const { validateAddress } = require('../services/addressValidation.service');
+
 // Zod validation schema
 const signupSchema = z.object({
-    fullName: z.string().min(1, 'Full name is required'),
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
     email: z.string().email('Invalid email address'),
     phone: z.string().min(1, 'Phone number is required'),
     serviceAddress: z.string().min(1, 'Service address is required'),
@@ -20,6 +24,8 @@ const signupSchema = z.object({
     }),
     smsOptIn: z.boolean().optional().default(false),
     password: z.string().min(8, 'Password must be at least 8 characters'),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
 });
 
 exports.startSignup = async (req, res) => {
@@ -30,7 +36,17 @@ exports.startSignup = async (req, res) => {
         return res.status(400).json({ error: 'Validation failed', details: errors });
     }
 
-    const { fullName, email, phone, serviceAddress, plan, smsOptIn, password } = parseResult.data;
+    const { firstName, lastName, email, phone, serviceAddress, plan, smsOptIn, password, latitude, longitude } = parseResult.data;
+    const fullName = `${firstName} ${lastName}`;
+
+    // 1.2 Validate address via Google Address Validation API
+    const validation = await validateAddress(serviceAddress);
+    if (!validation.isValid) {
+        return res.status(400).json({ 
+            error: 'Address validation failed', 
+            details: { serviceAddress: [validation.error] } 
+        });
+    }
 
     // 1.5. Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -54,7 +70,7 @@ exports.startSignup = async (req, res) => {
     }
 
     try {
-        // 3. Find or create Strconfiguredipe customer
+        // 3. Find or create Stripe customer
         let stripeCustomerId;
         const existingCustomers = await stripe.customers.list({ email, limit: 1 });
 
@@ -78,14 +94,20 @@ exports.startSignup = async (req, res) => {
         const waitingPeriodEnd = new Date(createdAt);
         waitingPeriodEnd.setDate(waitingPeriodEnd.getDate() + 30);
 
-        const bcrypt = require('bcryptjs');
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = new User({
+            firstName,
+            lastName,
             fullName,
             email,
             phone,
-            serviceAddress,
+            serviceAddress: validation.formattedAddress || serviceAddress,
+            addressStreet: validation.components?.street,
+            addressCity: validation.components?.city,
+            addressState: validation.components?.state,
+            addressZip: validation.components?.zip,
+            addressCountry: validation.components?.country || 'US',
             plan,
             smsOptIn,
             password: hashedPassword,

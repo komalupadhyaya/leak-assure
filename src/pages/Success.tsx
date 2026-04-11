@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { CheckCircle, Droplets, ArrowRight } from "lucide-react";
 import { getSessionDetails, SessionDetails } from "@/services/api";
@@ -12,6 +12,9 @@ const Success = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [countdown, setCountdown] = useState(5);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (!sessionId) {
       navigate("/");
@@ -20,8 +23,39 @@ const Success = () => {
 
     const fetchDetails = async () => {
       try {
+        console.log("Fetching session details for auto-login...");
         const data = await getSessionDetails(sessionId);
         setDetails(data);
+        
+        if (data.token && data.user) {
+          console.log("Session verified, storing credentials...");
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          
+          // Set cookie for cross-subdomain support (if not on localhost)
+          if (!window.location.hostname.includes('localhost')) {
+              const domain = window.location.hostname.split('.').slice(-2).join('.');
+              document.cookie = `token=${data.token}; path=/; domain=.${domain}; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
+          }
+          
+          // Force a small delay to ensure localStorage/cookies are committed before we start countdown
+          timerRef.current = setInterval(() => {
+            setCountdown((prev) => {
+              if (prev <= 1) {
+                if (timerRef.current) clearInterval(timerRef.current);
+                console.log("Auto-redirecting...");
+                if (data.user?.forcePasswordChange) {
+                    navigate("/member/change-password");
+                } else {
+                    navigate("/member/dashboard");
+                }
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else {
+          console.warn("No token or user data returned for session.");
+        }
       } catch (err) {
         console.error("Error fetching session details:", err);
         setError("Failed to load activation details.");
@@ -31,6 +65,10 @@ const Success = () => {
     };
 
     fetchDetails();
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [sessionId, navigate]);
 
   if (loading) {
@@ -47,11 +85,11 @@ const Success = () => {
   const planRules = {
     essential: {
       claims: "2 claims per year",
-      fee: "$125 per claim"
+      fee: "$150 per claim"
     },
     premium: {
       claims: "2 claims per year",
-      fee: "$125 per claim"
+      fee: "$100 per claim"
     }
   };
 
@@ -148,9 +186,24 @@ const Success = () => {
                 </ul>
               </div>
 
+              {/* Countdown for auto-redirect */}
+              {details?.token && (
+                <div className="text-center py-2">
+                  <p className="text-xs text-slate-400 font-medium animate-pulse">
+                    Auto-redirecting to Member Portal in {countdown}s...
+                  </p>
+                </div>
+              )}
+
               {/* CTA Button */}
               <button
-                onClick={() => navigate("/login")}
+                onClick={() => {
+                  if (details?.user?.forcePasswordChange) {
+                    navigate("/member/change-password");
+                  } else {
+                    navigate("/member/dashboard");
+                  }
+                }}
                 className="w-full mt-2 bg-gray-900 text-white font-bold rounded-md py-3.5 text-sm hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
               >
                 Go to Member Portal

@@ -1,278 +1,225 @@
 const nodemailer = require('nodemailer');
-const { Resend } = require('resend');
+const templates = require('../templates/emailTemplates');
 
-let resendClient;
-const getResendClient = () => {
-    if (!resendClient) {
-        if (!process.env.RESEND_API_KEY) {
-            console.error("CRITICAL: RESEND_API_KEY is missing from environment.");
-            throw new Error("RESEND_API_KEY is not configured.");
+let transporter;
+
+const getTransporter = () => {
+    if (!transporter) {
+        if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+            console.error("CRITICAL: SMTP configuration (USER/PASS) is missing from environment.");
+            throw new Error("SMTP is not configured.");
         }
-        resendClient = new Resend(process.env.RESEND_API_KEY);
+
+        transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT || '587'),
+            secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASSWORD,
+            },
+        });
+
+        console.log(`[SMTP] Transporter initialized for ${process.env.SMTP_HOST || 'smtp.gmail.com'}`);
     }
-    return resendClient;
+    return transporter;
 };
 
-// For production, use real SMTP credentials.
-// For testing, this will log to console if variables are missing.
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.ethereal.email',
-    port: process.env.EMAIL_PORT || 587,
-    auth: {
-        user: process.env.EMAIL_USER || 'test@example.com',
-        pass: process.env.EMAIL_PASS || 'password',
-    },
-});
+const EMAIL_FROM = process.env.EMAIL_FROM || 'support@leakassure.com';
 
-const sendEmail = async (to, subject, text, html) => {
+/**
+ * Core SMTP Sender Helper
+ */
+const sendEmail = async ({ to, subject, html, text }) => {
+    console.log(`\n--- INITIATING EMAIL SEND (SMTP) ---`);
+    console.log(`To: ${to}`);
+    console.log(`Subject: ${subject}`);
+    
     try {
-        if (!process.env.EMAIL_USER) {
-            console.log(`[EMAIL LOG] To: ${to} | Subject: ${subject} | Content: ${text}`);
-            return;
-        }
-        await transporter.sendMail({
-            from: '"Leak Assure" <no-reply@leakassure.com>',
+        const mailTransporter = getTransporter();
+        console.log(`[SMTP] Sending email via nodemailer...`);
+        
+        const info = await mailTransporter.sendMail({
+            from: `Leak Assure <${EMAIL_FROM}>`,
             to,
             subject,
             text,
             html,
         });
+
+        console.log(`[SMTP Success] Message ID: ${info.messageId}`);
+        return info;
     } catch (error) {
-        console.error('Error sending email:', error);
+        console.error('[Email Service Exception]:', error.message);
+        console.error(error.stack);
+        return null;
+    } finally {
+        console.log(`--- EMAIL SEND PROCESS FINISHED ---\n`);
     }
 };
 
-exports.sendSignupConfirmation = (email, name) => {
-    const subject = 'Welcome to Leak Assure Protection!';
-    const text = `Hi ${name}, thank you for joining Leak Assure. Your home is now protected.`;
-    const html = `<h1>Welcome to Leak Assure!</h1><p>Hi ${name}, your protection is now active.</p>`;
-    sendEmail(email, subject, text, html);
+exports.sendEmail = sendEmail;
+
+exports.sendSignupConfirmation = async (email, name) => {
+    const template = templates.welcomeEmail(name);
+    return await sendEmail({
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: `Hi ${name}, welcome to Leak Assure!`
+    });
 };
 
-exports.sendClaimConfirmation = (email, name, issueType) => {
+exports.sendClaimConfirmation = async (email, name, issueType) => {
     const subject = `Claim Received: ${issueType}`;
-    const text = `Hi ${name}, we have received your claim for ${issueType}. Our team is reviewing it now.`;
-    const html = `<h2>Claim Received</h2><p>We are processing your ${issueType} request.</p>`;
-    sendEmail(email, subject, text, html);
+    const html = `<h2>Claim Received</h2><p>Hi ${name}, we are processing your ${issueType} request.</p>`;
+    return await sendEmail({
+        to: email,
+        subject,
+        html,
+        text: `Hi ${name}, we received your claim for ${issueType}.`
+    });
 };
 
-exports.sendClaimStatusUpdate = (email, name, status) => {
+exports.sendClaimStatusUpdate = async (email, name, status) => {
     const subject = `Claim Update: ${status}`;
-    const text = `Hi ${name}, your claim status has been updated to: ${status}.`;
-    const html = `<h2>Claim Status Update</h2><p>Your claim is now: <strong>${status}</strong></p>`;
-    sendEmail(email, subject, text, html);
+    const html = `<h2>Claim Status Update</h2><p>Hi ${name}, your claim is now: <strong>${status}</strong></p>`;
+    return await sendEmail({
+        to: email,
+        subject,
+        html,
+        text: `Hi ${name}, your claim status is now ${status}.`
+    });
 };
 
-exports.sendCancellationNotice = (email, name) => {
-    const subject = 'Subscription Canceled';
-    const text = `Hi ${name}, your Leak Assure subscription has been canceled.`;
-    const html = `<h2>Subscription Canceled</h2><p>We're sorry to see you go.</p>`;
-    sendEmail(email, subject, text, html);
+exports.sendCancellationNotice = async (email, name) => {
+    const template = templates.cancellationEmail(name);
+    return await sendEmail({
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: `Hi ${name}, your subscription has been cancelled.`
+    });
 };
 
-exports.sendLoginCredentials = (email, name, tempPassword) => {
-    const subject = 'Welcome to Leak Assure — Your Account is Ready';
+exports.sendPaymentFailedNotice = async (email, name) => {
+    const template = templates.paymentFailedEmail(name);
+    return await sendEmail({
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: `Hi ${name}, your payment failed. Please update your details.`
+    });
+};
+
+exports.sendAffiliateStatusUpdate = async (email, name, status) => {
+    const template = templates.affiliateStatusEmail(name, status);
+    return await sendEmail({
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: `Hi ${name}, your affiliate status is now ${status}.`
+    });
+};
+
+exports.sendPayoutConfirmation = async (email, name, amount, method) => {
+    const template = templates.payoutEmail(name, amount, method);
+    return await sendEmail({
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: `Hi ${name}, your payout of $${amount} via ${method} is confirmed.`
+    });
+};
+
+exports.sendLoginCredentials = async (email, name, tempPassword) => {
     const loginUrl = `${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}/login`;
-    const text = `Hello ${name},
-
-Your Leak Assure protection plan has been activated.
-
-You can now access the Member Portal using the credentials below:
-
-Email: ${email}
-Temporary Password: ${tempPassword}
-
-Login here:
-${loginUrl}
-
-For security, please change your password after logging in.`;
-
+    const subject = 'Your Leak Assure Account is Ready';
     const html = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded: 12px;">
-            <h2 style="color: #1e293b;">Welcome to Leak Assure!</h2>
-            <p>Hello ${name},</p>
-            <p>Your Leak Assure protection plan has been activated. You can now access the Member Portal using the credentials below:</p>
-            <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-                <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background: #e2e8f0; padding: 2px 4px; border-radius: 4px;">${tempPassword}</code></p>
-            </div>
-            <p>
-                <a href="${loginUrl}" style="display: inline-block; background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Login to Member Portal</a>
-            </p>
-            <p style="color: #64748b; font-size: 0.875rem; margin-top: 20px;">For security, please change your password after logging in.</p>
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+            <h2>Welcome to Leak Assure!</h2>
+            <p>Hi ${name},</p>
+            <p>Your protection plan is active. Use the credentials below to log in:</p>
+            <p><strong>Email:</strong> ${email}<br><strong>Password:</strong> ${tempPassword}</p>
+            <a href="${loginUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Login Now</a>
         </div>
     `;
-    sendEmail(email, subject, text, html);
+    return await sendEmail({
+        to: email,
+        subject,
+        html,
+        text: `Login at ${loginUrl} with password ${tempPassword}`
+    });
 };
 
-
 exports.sendEnrollmentConfirmationEmail = async (user) => {
-    const isProduction = process.env.APP_ENV === 'production';
-    const adminEmail = process.env.EMAIL_RECEIVER || "komalsoftiatric@gmail.com";
-    const portalUrl = process.env.MEMBER_PORTAL || `${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}/login`;
-    const fromEmail = process.env.EMAIL_FROM || (isProduction ? 'noreply@leakassure.com' : 'onboarding@resend.dev');
+    const portalUrl = `${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}`;
+    const planDetails = user.plan === 'premium' ? {
+        name: 'Premium Protection Plan',
+        price: '$49/month',
+        serviceFee: '$100'
+    } : {
+        name: 'Essential Protection Plan',
+        price: '$29/month',
+        serviceFee: '$150'
+    };
 
-    try {
-        console.log("Preparing enrollment confirmation email for:", user.email);
-
-        const planDetails = user.plan === 'premium' ? {
-            name: 'Premium Protection',
-            price: '$49/month',
-            claims: 'Maximum 2 claims per year',
-            fee: '$125 service fee per claim'
-        } : {
-            name: 'Essential Protection',
-            price: '$29/month',
-            claims: 'Maximum 2 claims per year',
-            fee: '$99 service fee per claim'
-        };
-
-        const generateHtml = (isFallback = false) => `
-            <!DOCTYPE html>
-            <html>  
-            <head>
-                <style>
-                    .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; }
-                    .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #f0f4f8; }
-                    .badge { display: inline-block; background-color: #e6fffa; color: #2c7a7b; padding: 8px 16px; border-radius: 9999px; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
-                    .hero-text { font-size: 24px; font-weight: bold; color: #1a202c; margin-bottom: 10px; }
-                    .section { margin: 25px 0; }
-                    .details-box { background-color: #f7fafc; border: 1px solid #edf2f7; border-radius: 8px; padding: 20px; }
-                    .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
-                    .detail-label { color: #718096; }
-                    .detail-value { font-weight: 600; color: #2d3748; }
-                    .coverage-box { background-color: #ebf8ff; border-left: 4px solid #4299e1; padding: 15px; margin: 20px 0; }
-                    .coverage-title { font-weight: bold; color: #2b6cb0; margin-bottom: 5px; }
-                    .coverage-list { margin: 0; padding-left: 20px; font-size: 14px; }
-                    .button { display: block; width: 220px; margin: 30px auto; background-color: #2b6cb0; color: #ffffff !important; text-align: center; padding: 14px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; }
-                    .notice { font-size: 13px; color: #718096; font-style: italic; text-align: center; }
-                    .footer { font-size: 11px; color: #a0aec0; text-align: center; margin-top: 40px; border-top: 1px solid #edf2f7; padding-top: 20px; }
-                    .fallback-notice { background-color: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    ${isFallback ? `
-                    <div class="fallback-notice">
-                        <strong>Notice:</strong> This email was redirected to the monitoring inbox because the Resend account is still in testing mode and cannot send to external recipients.<br>
-                        <strong>Original Recipient:</strong> ${user.email}
-                    </div>` : ''}
-                    <div class="header">
-                        <div class="badge">✓ ACTIVATED</div>
-                        <div class="hero-text">You're Covered</div>
-                        <p style="color: #4a5568;">Your Leak Assure protection plan has been successfully activated.</p>
-                    </div>
-                    <div class="section">
-                        <div class="details-box">
-                            <div class="detail-row">
-                                <span class="detail-label">Full Name:</span>
-                                <span class="detail-value">${user.fullName}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Service Address:</span>
-                                <span class="detail-value">${user.serviceAddress}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Selected Plan:</span>
-                                <span class="detail-value">${planDetails.name}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Monthly Price:</span>
-                                <span class="detail-value">${planDetails.price}/month</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Effective Date:</span>
-                                <span class="detail-value">${user.activatedAt ? new Date(user.activatedAt).toLocaleDateString() : 'Immediate'}</span>
-                            </div>
-                        </div>
+    const html = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; background-color: #f8fafc; padding: 40px 20px;">
+            <div style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <div style="background-color: #2563eb; padding: 40px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.025em;">You're Protected</h1>
+                    <p style="color: #bfdbfe; margin-top: 8px; font-size: 16px;">Welcome to Leak Assure, ${user.fullName.split(' ')[0]}!</p>
+                </div>
+                
+                <div style="padding: 40px;">
+                    <p style="font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">Your protection plan has been successfully activated. We are thrilled to have you as a member and are committed to keeping your home leak-free.</p>
+                    
+                    <div style="background-color: #f1f5f9; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+                        <h2 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin: 0 0 16px 0;">Protection Summary</h2>
+                        
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; font-size: 14px; color: #64748b;">Plan Type</td>
+                                <td style="padding: 8px 0; font-size: 14px; font-weight: 700; text-align: right;">${planDetails.name}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-size: 14px; color: #64748b;">Monthly Installment</td>
+                                <td style="padding: 8px 0; font-size: 14px; font-weight: 700; text-align: right;">${planDetails.price}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-size: 14px; color: #64748b;">Service Fee</td>
+                                <td style="padding: 8px 0; font-size: 14px; font-weight: 700; text-align: right;">${planDetails.serviceFee} per visit</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-size: 14px; color: #64748b;">Service Address</td>
+                                <td style="padding: 8px 0; font-size: 14px; font-weight: 700; text-align: right;">${user.serviceAddress}</td>
+                            </tr>
+                        </table>
                     </div>
 
-                    <div class="coverage-box">
-                        <div class="coverage-title">${planDetails.name} Summary</div>
-                        <ul class="coverage-list">
-                            <li>${planDetails.claims}</li>
-                            <li>${planDetails.fee}</li>
-                        </ul>
+                    <div style="text-align: center;">
+                        <a href="${portalUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.25);">Access Member Portal</a>
                     </div>
-
-                    <div class="section" style="text-align: center;">
-                        <p style="font-weight: bold; color: #e53e3e;">Waiting Period Notice</p>
-                        <p style="font-size: 14px; color: #718096;">Coverage begins after the 30-day waiting period (${user.waitingPeriodEnd ? new Date(user.waitingPeriodEnd).toLocaleDateString() : 'N/A'}).</p>
-                    </div>
-
-                    <div class="section">
-                        <p style="font-weight: bold; color: #2d3748;">What happens next?</p>
-                        <ul style="font-size: 14px; color: #4a5568; line-height: 1.6;">
-                            <li>Check your email for confirmation</li>
-                            <li>Save your coverage details for your records</li>
-                            <li>Use the Member Portal to file claims</li>
-                        </ul>
-                    </div>
-
-                    <a href="${portalUrl}" class="button">Access Member Portal</a>
-
-                    <div class="footer">
-                        <p><strong>THIS IS A SERVICE CONTRACT. THIS IS NOT INSURANCE.</strong></p>
-                        <p>Coverage is subject to the Leak Assure Service Contract Policy and plan limitations.</p>
-                        <p>&copy; ${new Date().getFullYear()} Leak Assure. All rights reserved.</p>
+                    
+                    <div style="margin-top: 40px; padding-top: 32px; border-top: 1px solid #e2e8f0;">
+                        <p style="font-size: 14px; font-weight: 700; margin: 0 0 8px 0;">Important Coverage Note:</p>
+                        <p style="font-size: 13px; color: #64748b; margin: 0; line-height: 1.5;">Per your terms, your protection is subject to a 30-day waiting period. Any leaks occurring before ${user.waitingPeriodEnd ? new Date(user.waitingPeriodEnd).toLocaleDateString() : '30 days from today'} are not eligible for coverage.</p>
                     </div>
                 </div>
-            </body>
-            </html>
-        `;
+                
+                <div style="background-color: #f8fafc; padding: 32px; text-align: center;">
+                    <p style="font-size: 12px; color: #94a3b8; margin: 0;">&copy; ${new Date().getFullYear()} Leak Assure Home Protection. All rights reserved.</p>
+                    <p style="font-size: 10px; color: #cbd5e1; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;">This is a service contract. This is not insurance.</p>
+                </div>
+            </div>
+        </div>
+    `;
 
-        const resend = getResendClient();
-
-        console.log("Attempting to send email to member:", user.email);
-
-        const primaryMailOptions = {
-            from: fromEmail,
-            to: isProduction ? user.email : [user.email, adminEmail],
-            bcc: isProduction ? adminEmail : undefined,
-            subject: isProduction
-                ? "You're Covered: Leak Assure Enrollment Confirmation"
-                : `[DEV] You're Covered: Leak Assure Enrollment Confirmation`,
-            html: generateHtml(false)
-        };
-
-        const { data, error } = await resend.emails.send(primaryMailOptions);
-
-        if (error) {
-            // Check if it's a Resend validation error related to testing mode
-            const isBlockedError = error.name === 'validation_error' ||
-                (error.message && error.message.includes("testing emails to your own email address"));
-
-            if (!isProduction && isBlockedError) {
-                console.log("Email blocked by Resend. Sending fallback to monitoring email:", adminEmail);
-
-                const fallbackMailOptions = {
-                    from: fromEmail,
-                    to: adminEmail,
-                    subject: `[TEST MODE] Enrollment Confirmation for ${user.email}`,
-                    html: generateHtml(true)
-                };
-
-                const fallbackResult = await resend.emails.send(fallbackMailOptions);
-
-                if (fallbackResult.error) {
-                    throw new Error(`Fallback email delivery failed: ${fallbackResult.error.message}`);
-                }
-
-                return fallbackResult.data;
-            }
-
-            console.error("RESEND ERROR:", error);
-            throw new Error(`Email delivery failed: ${error.message}`);
-        }
-
-        console.log("Enrollment confirmation email sent to:", user.email);
-        if (isProduction || !isProduction) {
-            console.log("Monitoring copy sent to:", adminEmail);
-        }
-        return data;
-
-    } catch (err) {
-        console.error("EMAIL SERVICE ERROR:", err);
-        throw err;
-    }
+    return await sendEmail({
+        to: user.email,
+        subject: "Welcome to Leak Assure: Your Home is Protected!",
+        html,
+        text: `Welcome to Leak Assure! Your ${planDetails.name} has been activated for ${user.serviceAddress}.`
+    });
 };

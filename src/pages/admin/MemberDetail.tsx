@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import AdminLayout from "./AdminLayout";
-import { getMemberById, cancelSubscription, getClaimsByMember, addMemberNote } from "@/services/api";
+import { getMemberById, cancelSubscription, getClaimsByMember, addMemberNote, resetMemberPassword } from "@/services/api";
 import {
     User,
     Mail,
@@ -31,6 +31,8 @@ const MemberDetail = () => {
     const [activeTab, setActiveTab] = useState<'claims' | 'payments' | 'notes'>('claims');
     const [newNote, setNewNote] = useState("");
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+    const [resetPasswordValue, setResetPasswordValue] = useState("");
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
 
     const fetchMemberData = async () => {
         try {
@@ -83,6 +85,25 @@ const MemberDetail = () => {
             }
         } catch (error) {
             toast.error("Failed to add note");
+        }
+    };
+
+    const handleResetPassword = async () => {
+        if (!resetPasswordValue || resetPasswordValue.length < 8) {
+            toast.error("Password must be at least 8 characters.");
+            return;
+        }
+        setIsResettingPassword(true);
+        try {
+            if (id) {
+                await resetMemberPassword(id, resetPasswordValue);
+                toast.success("Password reset successfully. Member will be prompted to change it on next login.");
+                setResetPasswordValue("");
+            }
+        } catch {
+            toast.error("Failed to reset password.");
+        } finally {
+            setIsResettingPassword(false);
         }
     };
 
@@ -326,6 +347,27 @@ const MemberDetail = () => {
                                 <p className="text-xs text-slate-500 leading-relaxed italic">
                                     Sudden plumbing leaks are covered after the initial 30-day enrollment period.
                                 </p>
+                            </div>
+                        </div>
+
+                        {/* Reset Password */}
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Reset Member Password</p>
+                            <div className="space-y-3">
+                                <input
+                                    type="password"
+                                    value={resetPasswordValue}
+                                    onChange={(e) => setResetPasswordValue(e.target.value)}
+                                    placeholder="New password (min. 8 chars)"
+                                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 transition-all"
+                                />
+                                <button
+                                    onClick={handleResetPassword}
+                                    disabled={isResettingPassword}
+                                    className="w-full py-2.5 rounded-xl bg-amber-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-amber-700 transition-all disabled:opacity-50"
+                                >
+                                    {isResettingPassword ? "Resetting..." : "Reset Password"}
+                                </button>
                             </div>
                         </div>
                     </div>

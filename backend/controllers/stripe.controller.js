@@ -5,6 +5,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
 });
 
+const emailService = require('../services/email.service');
+const Referral = require('../models/Referral');
+const Commission = require('../models/Commission');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
 exports.handleWebhook = async (req, res) => {
 
     console.log("\n================ STRIPE WEBHOOK RECEIVED ================");
@@ -18,96 +25,82 @@ exports.handleWebhook = async (req, res) => {
     let event;
 
     try {
-
         event = stripe.webhooks.constructEvent(
             req.body,
             sig,
             process.env.STRIPE_WEBHOOK_SECRET
         );
-
-        console.log("Webhook verification SUCCESS");
-        console.log("Event Type:", event.type);
-
+        console.log("Webhook verification SUCCESS. Event Type:", event.type);
     } catch (err) {
-
-        console.error("Webhook signature verification FAILED");
-        console.error(err.message);
-
+        console.error("Webhook signature verification FAILED:", err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    console.log("Stripe webhook received:", event.type);
-
     if (event.type === 'checkout.session.completed') {
-
         const session = event.data.object;
 
         console.log("\n--- PROCESSING CHECKOUT SESSION ---");
-
         console.log("Session ID:", session.id);
         console.log("Customer ID:", session.customer);
         console.log("Subscription ID:", session.subscription);
-        console.log("Amount Total:", session.amount_total);
         console.log("Metadata Email:", session.metadata?.email);
 
         try {
+            // Enhanced lookup: try Session ID first, then Customer ID, then Email
             const user = await User.findOne({
                 $or: [
+                    { stripeSessionId: session.id },
                     { stripeCustomerId: session.customer },
                     { email: session.metadata?.email }
                 ]
             });
 
-            console.log("Customer ID:", session.customer);
-            console.log("Metadata Email:", session.metadata?.email);
-            console.log("User Lookup Result:", user ? `FOUND (${user.email})` : "NOT FOUND");
+            console.log("User Lookup Result:", user ? `FOUND (${user.email}, ID: ${user._id})` : "NOT FOUND");
 
             if (!user) {
-                console.warn("No user matched this Stripe session.");
+                console.warn("CRITICAL: No user matched this Stripe session. Database might be out of sync.");
                 return res.json({ received: true });
             }
-
-            if (user.subscriptionStatus === 'active') {
-                console.log("User already active. Skipping duplicate webhook.");
-                return res.json({ received: true });
-            }
-
-            let planPrice = 0;
-            if (session.amount_total) {
-                planPrice = session.amount_total / 100;
-            } else {
-                planPrice = user.plan === 'premium' ? 49 : 29;
-            }
-
-            user.stripeSubscriptionId = session.subscription;
-            user.subscriptionStatus = 'active';
-            user.activatedAt = new Date();
-            user.lastPaymentDate = new Date();
-            user.planPrice = planPrice;
 
             let sendCredentials = false;
             let tempPassword = '';
 
-            if (!user.password) {
-                console.log("User has no password. Generating temporary credentials.");
-                const crypto = require('crypto');
-                const bcrypt = require('bcryptjs');
-                tempPassword = crypto.randomBytes(4).toString('hex');
-                const hashedPassword = await bcrypt.hash(tempPassword, 10);
-                user.password = hashedPassword;
-                user.forcePasswordChange = true;
-                sendCredentials = true;
+            if (user.subscriptionStatus !== 'active') {
+                console.log("[Webhook] Updating user status to active...");
+                
+                let planPrice = 0;
+                if (session.amount_total) {
+                    planPrice = session.amount_total / 100;
+                } else {
+                    planPrice = user.plan === 'premium' ? 49 : 29;
+                }
+
+                user.stripeSubscriptionId = session.subscription;
+                user.subscriptionStatus = 'active';
+                user.activatedAt = new Date();
+                user.lastPaymentDate = new Date();
+                user.planPrice = planPrice;
+
+                if (!user.password) {
+                    console.log(`[Stripe Webhook] Generating temporary credentials for new user: ${user.email}`);
+                    tempPassword = crypto.randomBytes(4).toString('hex');
+                    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+                    user.password = hashedPassword;
+                    user.forcePasswordChange = true;
+                    sendCredentials = true;
+                }
+
+                await user.save();
+                console.log("[Webhook] User record updated successfully. Current status:", user.subscriptionStatus);
+            } else {
+                console.log("[Webhook] User already active. Processing remaining triggers (email, referrals)...");
             }
 
-            await user.save();
-            console.log("User successfully activated via webhook:", user.email);
-
             // --- AFFILIATE CONVERSION & COMMISSION ---
-            const Referral = require('../models/Referral');
-            const Commission = require('../models/Commission');
             try {
                 const referral = await Referral.findOne({ referredUserId: user._id, convertedAt: null });
                 if (referral) {
+                    console.log("[Webhook] Found referral to convert.");
                     referral.convertedAt = new Date();
                     await referral.save();
 
@@ -119,46 +112,50 @@ exports.handleWebhook = async (req, res) => {
                         status: 'pending',
                     });
                     await commission.save();
-                    console.log(`[Webhook] Created commission for affiliate ${referral.affiliateId} for user ${user.email}`);
+                    console.log(`[Webhook] Referral record updated and commission created.`);
                 }
             } catch (refErr) {
-                console.error('[Webhook] Failed to process referral conversion:', refErr.message);
+                console.error('[Webhook Referral Error]:', refErr.message);
             }
 
-            const emailService = require('../services/email.service');
-
-            // --- SEND ENROLLMENT CONFIRMATION EMAIL (RESEND) ---
+            // --- SEND ENROLLMENT CONFIRMATION EMAIL & SMS ---
+            console.log("[Webhook] Checking confirmationEmailSent flag:", user.confirmationEmailSent);
             if (!user.confirmationEmailSent) {
-                console.log("Sending enrollment confirmation email");
+                console.log("[Webhook] Triggering enrollment notification to:", user.email);
                 try {
-                    await emailService.sendEnrollmentConfirmationEmail(user);
-                    user.confirmationEmailSent = true;
-                    await user.save();
-                    console.log("Confirmation email sent successfully");
-                } catch (emailError) {
-                    console.error("EMAIL DELIVERY FAILED");
-                    console.error(emailError);
-                    // Do not break the webhook, just log it.
+                    // Send Email
+                    const emailResult = await emailService.sendEnrollmentConfirmationEmail(user);
+                    
+                    // Send SMS if phone exists
+                    if (user.phone) {
+                        const smsService = require('../services/sms.service');
+                        await smsService.sendEnrollmentConfirmationSMS(user.phone, user.fullName);
+                    }
+
+                    if (emailResult) {
+                        user.confirmationEmailSent = true;
+                        // Use findOneAndUpdate to avoid version conflicts if another save is happening
+                        await User.findByIdAndUpdate(user._id, { confirmationEmailSent: true });
+                    }
+                } catch (notifyError) {
+                    console.error("[Webhook Notification Exception]:", notifyError.message);
                 }
             } else {
-                console.log("Enrollment email already sent, skipping duplicate.");
+                console.log("[Webhook] confirmationEmailSent is already true. Skipping.");
             }
 
-            // --- LEGACY EMAIL CALLS (kept for credentials if needed) ---
+            // --- SEND CREDENTIALS IF NEEDED ---
             if (sendCredentials) {
-                console.log("Sending additional login credentials email");
-                emailService.sendLoginCredentials(
-                    user.email,
-                    user.fullName,
-                    tempPassword
-                );
+                console.log("[Webhook] Sending login credentials email...");
+                try {
+                    await emailService.sendLoginCredentials(user.email, user.fullName, tempPassword);
+                } catch (credError) {
+                    console.error("[Webhook Credentials Email Error]:", credError.message);
+                }
             }
 
         } catch (error) {
-
-            console.error("ERROR during checkout.session.completed processing");
-            console.error(error);
-
+            console.error("FATAL ERROR during checkout.session.completed processing:", error);
             return res.status(500).json({ error: 'Internal server error' });
         }
 
@@ -171,32 +168,25 @@ exports.handleWebhook = async (req, res) => {
         console.log("Customer ID:", invoice.customer);
 
         try {
-
             const user = await User.findOne({ stripeCustomerId: invoice.customer });
-
             if (user) {
-
                 const gracePeriod = new Date();
                 gracePeriod.setDate(gracePeriod.getDate() + 7);
 
                 user.subscriptionStatus = 'past_due';
                 user.paymentGraceUntil = gracePeriod;
-
                 await user.save();
 
                 console.log("User marked past_due with grace period:", user.email);
-
+                
+                // NOTIFY USER ABOUT FAILED PAYMENT
+                await emailService.sendPaymentFailedNotice(user.email, user.fullName);
             } else {
-
                 console.warn("No user found for failed invoice customer:", invoice.customer);
-
             }
-
         } catch (error) {
-
             console.error("Error handling invoice.payment_failed");
             console.error(error);
-
         }
 
     } else if (event.type === 'customer.subscription.deleted') {
@@ -207,28 +197,20 @@ exports.handleWebhook = async (req, res) => {
         console.log("Subscription ID:", subscription.id);
 
         try {
-
             const user = await User.findOne({ stripeSubscriptionId: subscription.id });
-
             if (user) {
-
                 user.subscriptionStatus = 'canceled';
-
                 await user.save();
-
                 console.log("User subscription canceled:", user.email);
-
+                
+                // NOTIFY USER ABOUT CANCELLATION
+                await emailService.sendCancellationNotice(user.email, user.fullName);
             } else {
-
                 console.warn("No user found for canceled subscription:", subscription.id);
-
             }
-
         } catch (error) {
-
             console.error("Error processing subscription.deleted event");
             console.error(error);
-
         }
     }
 
@@ -260,12 +242,31 @@ exports.getSessionDetails = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        const token = jwt.sign({ id: user._id, email: user.email, role: user.role || 'member' }, process.env.JWT_SECRET || 'your_fallback_secret_key', { expiresIn: '7d' });
+
+        // Set cookie for cross-subdomain auto-login
+        res.cookie('token', token, {
+            httpOnly: false, // Set to false so frontend can read it for cross-subdomain auto-login
+            secure: true,
+            sameSite: 'none',
+            domain: process.env.COOKIE_DOMAIN || '.leakassure.com',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+
         res.json({
             name: user.fullName,
             serviceAddress: user.serviceAddress,
             plan: user.plan,
             price: user.planPrice || (user.plan === 'premium' ? 49 : 29),
-            waitingPeriodEnd: user.waitingPeriodEnd
+            waitingPeriodEnd: user.waitingPeriodEnd,
+            token,
+            user: {
+                id: user._id,
+                email: user.email,
+                fullName: user.fullName,
+                role: user.role || 'member',
+                forcePasswordChange: user.forcePasswordChange
+            }
         });
 
     } catch (error) {

@@ -47,8 +47,8 @@ function CoverageTermsModal({ onClose }: { onClose: () => void }) {
                         the damage before repairs begin.
                     </p>
                     <p>
-                        <strong>5. Service Fees.</strong> A service fee applies to each claim visit: $99 for Essential
-                        Protection and $125 for Premium Protection.
+                        <strong>5. Service Fees.</strong> A service fee applies to each claim visit: $150 for Essential
+                        Protection and $100 for Premium Protection.
                     </p>
                     <p>
                         <strong>6. Cancellation.</strong> You may cancel your subscription at any time. Coverage
@@ -71,6 +71,70 @@ function CoverageTermsModal({ onClose }: { onClose: () => void }) {
 }
 
 // ──────────────────────────────────────────────
+// Plan Detail Modal
+// ──────────────────────────────────────────────
+const PLAN_DETAILS = {
+    essential: [
+        { heading: "Plan Summary", bullets: ["Essential interior plumbing leak protection", "$29/month subscription", "2 claims per 12-month period", "$150 service fee per approved visit"] },
+        { heading: "What's Covered", bullets: ["Sudden and accidental interior plumbing failures"] },
+        { heading: "Hidden Leak Coverage", bullets: ["Concealed pipe leaks inside walls, ceilings, or floors", "Water damage from hidden plumbing failures"] },
+        { heading: "Frozen Pipe Protection", bullets: ["Burst pipes caused by freezing temperatures", "Emergency access and repair authorization"] },
+        { heading: "Access & Basic Repair", bullets: ["Wall or floor access to reach pipes", "Basic patch and repair following leak fix"] },
+        { heading: "Clogs and Behind-Wall Leaks", bullets: ["Drain line clogs causing internal backup", "Leaks behind walls from supply lines"] },
+    ],
+    premium: [
+        { heading: "Plan Summary", bullets: ["Full premium interior plumbing protection", "$49/month subscription", "2 claims per 12-month period", "$100 service fee per approved visit"] },
+        { heading: "Includes Everything in Essential PLUS", bullets: ["All Essential plan coverage included"] },
+        { heading: "Expanded Coverage", bullets: ["Greater scope of covered plumbing systems", "Broader access and repair allowances"] },
+        { heading: "Water Heater Leak Support", bullets: ["Leaks originating from the water heater unit", "Connection and supply line failures"] },
+        { heading: "Drain & Fixture Support", bullets: ["Drain line failures causing leaks", "Fixture supply line leaks at connection points"] },
+        { heading: "Enhanced Access Coverage", bullets: ["Drywall, tile, and flooring access included", "Extended repair area coverage"] },
+        { heading: "What's Not Covered", bullets: ["Pre-existing conditions", "Gradual or slow leaks", "Storm or flood damage", "Homeowner-caused damage", "Appliances other than water heater connections"] },
+        { heading: "Important Notes", bullets: ["30-day waiting period applies", "Licensed Leak Assure plumber must assess repairs", "Claim must be filed within 48 hours of discovery"] },
+    ],
+};
+
+function PlanDetailModal({ plan, onClose }: { plan: "essential" | "premium"; onClose: () => void }) {
+    const sections = PLAN_DETAILS[plan];
+    const title = plan === "essential" ? "Essential Protection" : "Premium Protection";
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+                <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100">
+                    <h2 className="text-lg font-bold text-gray-900">{title} — Full Coverage Details</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1" aria-label="Close">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+                <div className="overflow-y-auto px-5 sm:px-6 py-5 space-y-5">
+                    {sections.map((s) => (
+                        <div key={s.heading}>
+                            <p className="text-xs font-black text-slate-900 uppercase tracking-widest mb-2">{s.heading}</p>
+                            <ul className="space-y-1">
+                                {s.bullets.map((b) => (
+                                    <li key={b} className="flex items-start gap-2 text-sm text-slate-600">
+                                        <span className="text-blue-500 font-bold mt-0.5">•</span>
+                                        {b}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors"
+                    >
+                        Continue with this plan
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ──────────────────────────────────────────────
 // Field-level error message
 // ──────────────────────────────────────────────
 function FieldError({ message }: { message?: string }) {
@@ -82,13 +146,15 @@ function FieldError({ message }: { message?: string }) {
 // SignupForm
 // ──────────────────────────────────────────────
 interface FormValues {
-    fullName: string;
+    firstName: string;
+    lastName: string;
     email: string;
     phone: string;
     serviceAddress: string;
     plan: "essential" | "premium" | "";
     smsOptIn: boolean;
     coverageAgreed: boolean;
+    conditionsAgreed: boolean;
     password: string;
     confirmPassword: string;
     latitude?: number;
@@ -96,12 +162,14 @@ interface FormValues {
 }
 
 interface FormErrors {
-    fullName?: string;
+    firstName?: string;
+    lastName?: string;
     email?: string;
     phone?: string;
     serviceAddress?: string;
     plan?: string;
     coverageAgreed?: string;
+    conditionsAgreed?: string;
     password?: string;
     confirmPassword?: string;
     general?: string;
@@ -113,26 +181,28 @@ const PLANS = [
         label: "Essential Protection",
         price: 29,
         claims: "2 claims per year",
-        fee: "$125 per claim"
+        fee: "$150 per claim"
     },
     {
         value: "premium",
         label: "Premium Protection",
         price: 49,
         claims: "2 claims per year",
-        fee: "$125 per claim"
+        fee: "$100 per claim"
     },
 ] as const;
 
 export function SignupForm() {
     const [form, setForm] = useState<FormValues>({
-        fullName: "",
+        firstName: "",
+        lastName: "",
         email: "",
         phone: "",
         serviceAddress: "",
         plan: "",
         smsOptIn: false,
         coverageAgreed: false,
+        conditionsAgreed: false,
         password: "",
         confirmPassword: "",
         latitude: undefined,
@@ -141,6 +211,7 @@ export function SignupForm() {
     const [errors, setErrors] = useState<FormErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showTermsModal, setShowTermsModal] = useState(false);
+    const [showPlanModal, setShowPlanModal] = useState<"essential" | "premium" | null>(null);
 
 
     // ── handlers ──
@@ -164,7 +235,8 @@ export function SignupForm() {
         const newErrors: FormErrors = {};
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-        if (!form.fullName.trim()) newErrors.fullName = "Full name is required.";
+        if (!form.firstName.trim()) newErrors.firstName = "First name is required.";
+        if (!form.lastName.trim()) newErrors.lastName = "Last name is required.";
         if (!form.email.trim()) {
             newErrors.email = "Email address is required.";
         } else if (!emailRegex.test(form.email)) {
@@ -177,6 +249,9 @@ export function SignupForm() {
         if (!form.coverageAgreed)
             newErrors.coverageAgreed =
                 "You must agree to the Coverage Terms to continue.";
+        if (!form.conditionsAgreed)
+            newErrors.conditionsAgreed =
+                "You must agree to the Coverage Conditions to continue.";
 
         if (!form.password) {
             newErrors.password = "Password is required.";
@@ -202,7 +277,8 @@ export function SignupForm() {
 
         try {
             const { url } = await startSignup({
-                fullName: form.fullName,
+                firstName: form.firstName.trim(),
+                lastName: form.lastName.trim(),
                 email: form.email,
                 phone: form.phone,
                 serviceAddress: form.serviceAddress,
@@ -233,21 +309,39 @@ export function SignupForm() {
             {showTermsModal && (
                 <CoverageTermsModal onClose={() => setShowTermsModal(false)} />
             )}
+            {showPlanModal && (
+                <PlanDetailModal plan={showPlanModal} onClose={() => setShowPlanModal(null)} />
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-                {/* 1. Full Name */}
-                <div>
-                    <input
-                        id="fullName"
-                        name="fullName"
-                        type="text"
-                        placeholder="Full Name"
-                        value={form.fullName}
-                        onChange={handleChange}
-                        className={inputClass("fullName")}
-                        autoComplete="name"
-                    />
-                    <FieldError message={errors.fullName} />
+                {/* 1. First & Last Name */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <input
+                            id="firstName"
+                            name="firstName"
+                            type="text"
+                            placeholder="First Name"
+                            value={form.firstName}
+                            onChange={handleChange}
+                            className={inputClass("firstName")}
+                            autoComplete="given-name"
+                        />
+                        <FieldError message={errors.firstName} />
+                    </div>
+                    <div>
+                        <input
+                            id="lastName"
+                            name="lastName"
+                            type="text"
+                            placeholder="Last Name"
+                            value={form.lastName}
+                            onChange={handleChange}
+                            className={inputClass("lastName")}
+                            autoComplete="family-name"
+                        />
+                        <FieldError message={errors.lastName} />
+                    </div>
                 </div>
 
                 {/* 2. Email Address */}
@@ -284,12 +378,12 @@ export function SignupForm() {
                 <div>
                     <AddressAutocomplete
                         value={form.serviceAddress}
-                        onSelect={(address, lat, lon) => {
+                        onSelect={(address, components) => {
                             setForm(prev => ({
                                 ...prev,
                                 serviceAddress: address,
-                                latitude: lat,
-                                longitude: lon
+                                // We'll spread components if they exist, or just clear them
+                                ...(components || {})
                             }));
                             setErrors(prev => ({ ...prev, serviceAddress: undefined }));
                         }}
@@ -308,14 +402,22 @@ export function SignupForm() {
                         {PLANS.map((p) => {
                             const isSelected = form.plan === p.value;
                             return (
-                                <button
+                                <div
                                     key={p.value}
-                                    type="button"
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={() => {
                                         setForm(prev => ({ ...prev, plan: p.value }));
                                         setErrors(prev => ({ ...prev, plan: undefined }));
                                     }}
-                                    className={`relative p-5 rounded-2xl border-2 text-left transition-all duration-300 group hover:shadow-md ${isSelected
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setForm(prev => ({ ...prev, plan: p.value }));
+                                            setErrors(prev => ({ ...prev, plan: undefined }));
+                                        }
+                                    }}
+                                    className={`relative p-5 rounded-2xl border-2 text-left cursor-pointer transition-all duration-300 group hover:shadow-md ${isSelected
                                         ? "border-blue-600 bg-blue-50/50 ring-4 ring-blue-500/5 shadow-blue-100/20"
                                         : "border-slate-100 bg-slate-50/50 hover:border-slate-200"
                                         }`}
@@ -339,7 +441,14 @@ export function SignupForm() {
                                             {p.fee} (Service fee)
                                         </li>
                                     </ul>
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setShowPlanModal(p.value as "essential" | "premium"); }}
+                                        className="mt-3 text-[11px] font-bold text-blue-600 hover:underline underline-offset-2"
+                                    >
+                                        View full coverage details →
+                                    </button>
+                                </div>
                             );
                         })}
                     </div>
@@ -392,6 +501,37 @@ export function SignupForm() {
                     </label>
                 </div>
 
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+                    <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">Coverage Conditions</p>
+                    <ul className="space-y-1.5 mb-4">
+                        {[
+                            "Coverage applies per 12-month period",
+                            "Service fee required per approved visit",
+                            "Coverage applies to sudden and accidental issues only",
+                            "Pre-existing conditions are not covered",
+                            "Waiting period applies before coverage begins",
+                        ].map((c) => (
+                            <li key={c} className="flex items-start gap-2 text-[12px] text-slate-600">
+                                <span className="text-blue-500 font-bold mt-0.5">•</span>{c}
+                            </li>
+                        ))}
+                    </ul>
+                    <label className="flex items-start gap-4 cursor-pointer select-none">
+                        <input
+                            id="conditionsAgreed"
+                            name="conditionsAgreed"
+                            type="checkbox"
+                            checked={form.conditionsAgreed}
+                            onChange={handleChange}
+                            className={`mt-1 h-5 w-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer flex-shrink-0 transition-all ${errors.conditionsAgreed ? 'border-red-400' : ''}`}
+                        />
+                        <span className="text-[13px] text-slate-600 leading-relaxed font-medium">
+                            I verify that I have read the coverage conditions and understand the eligibility requirements.
+                        </span>
+                    </label>
+                    <FieldError message={errors.conditionsAgreed} />
+                </div>
+
                 {/* Coverage Terms */}
                 <div
                     className={`rounded-2xl border p-4 transition-all ${errors.coverageAgreed
@@ -409,14 +549,15 @@ export function SignupForm() {
                             className={`mt-1 h-5 w-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer flex-shrink-0 transition-all ${errors.coverageAgreed ? 'border-red-400' : ''}`}
                         />
                         <span className="text-[13px] text-slate-600 leading-relaxed font-medium">
-                            I understand coverage applies to sudden plumbing leaks and is
-                            subject to coverage limits. I agree to the <button
+                            I agree to the{" "}
+                            <button
                                 type="button"
                                 onClick={() => setShowTermsModal(true)}
                                 className="text-blue-600 font-bold hover:underline underline-offset-4 decoration-2"
                             >
                                 Coverage Terms
-                            </button>.
+                            </button>{" "}
+                            and understand service fees, limits, and exclusions apply.
                         </span>
                     </label>
                     <FieldError message={errors.coverageAgreed} />

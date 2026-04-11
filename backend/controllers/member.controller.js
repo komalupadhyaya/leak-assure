@@ -227,7 +227,7 @@ exports.cancelSubscription = async (req, res) => {
         });
 
         const emailService = require('../services/email.service');
-        emailService.sendCancellationNotice(member.email, member.fullName);
+        await emailService.sendCancellationNotice(member.email, member.fullName);
 
         res.json({ message: 'Subscription canceled successfully', member });
     } catch (error) {

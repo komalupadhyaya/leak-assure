@@ -54,8 +54,8 @@ const Dashboard = () => {
     const isActive = profile.subscriptionStatus === 'active';
 
     const planDetails = isPremium
-        ? { claimsPerYear: "2 claims per year", serviceFee: "$125 per claim" }
-        : { claimsPerYear: "2 claims per year", serviceFee: "$125 per claim" };
+        ? { claimsPerYear: "2 claims per year", serviceFee: "$100 per claim" }
+        : { claimsPerYear: "2 claims per year", serviceFee: "$150 per claim" };
 
     const coverageStarted = profile.waitingPeriodEnd && new Date(profile.waitingPeriodEnd) < new Date();
 
@@ -211,6 +211,55 @@ const Dashboard = () => {
                         </ul>
                     </div>
                 </div>
+
+                {/* Coverage & Policy Section */}
+                <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 bg-blue-50 rounded-lg flex items-center justify-center">
+                                <FileText className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-900">Coverage &amp; Policy</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Your full protection plan agreement</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-5 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <a
+                                href="/coverage-terms"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all group"
+                            >
+                                <div className="h-9 w-9 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                    <FileText className="h-4 w-4 text-slate-500 group-hover:text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-slate-900 text-sm">View Full Policy</p>
+                                    <p className="text-[11px] text-slate-500">Read your complete coverage terms</p>
+                                </div>
+                            </a>
+                            <a
+                                href="/coverage-terms-download"
+                                download
+                                className="flex items-center gap-3 p-4 rounded-xl border border-slate-100 hover:border-green-200 hover:bg-green-50/50 transition-all group"
+                            >
+                                <div className="h-9 w-9 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                                    <ArrowRight className="h-4 w-4 text-slate-500 group-hover:text-green-600 rotate-90" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-slate-900 text-sm">Download PDF</p>
+                                    <p className="text-[11px] text-slate-500">Save a copy for your records</p>
+                                </div>
+                            </a>
+                        </div>
+                        <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-500 leading-relaxed">
+                            Coverage is subject to a 30-day waiting period and applies to sudden and accidental interior plumbing failures only. Service fee of {planDetails.serviceFee} applies per approved visit.
+                        </div>
+                    </div>
+                </section>
             </div>
         </MemberLayout>
     );

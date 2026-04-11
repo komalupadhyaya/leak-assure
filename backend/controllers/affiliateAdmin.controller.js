@@ -3,6 +3,7 @@ const Referral = require('../models/Referral');
 const Commission = require('../models/Commission');
 const Payout = require('../models/Payout');
 const Creative = require('../models/Creative');
+const emailService = require('../services/email.service');
 
 // GET /api/admin/affiliates
 exports.getAllAffiliates = async (req, res) => {
@@ -45,6 +46,10 @@ exports.updateAffiliateStatus = async (req, res) => {
         }
         const affiliate = await Affiliate.findByIdAndUpdate(req.params.id, { status }, { new: true }).select('-password');
         if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
+        
+        // NOTIFY AFFILIATE
+        await emailService.sendAffiliateStatusUpdate(affiliate.email, affiliate.name, status);
+        
         return res.json(affiliate);
     } catch (err) {
         console.error('[AffiliateAdmin.updateStatus]', err);
@@ -106,6 +111,9 @@ exports.updateCommissionStatus = async (req, res) => {
                 notes: `System generated from commission ${commission._id}`
             });
             await payout.save();
+
+            // NOTIFY AFFILIATE
+            await emailService.sendPayoutConfirmation(affiliate.email, affiliate.name, commission.amount, req.body.method);
         }
 
         return res.json(commission);

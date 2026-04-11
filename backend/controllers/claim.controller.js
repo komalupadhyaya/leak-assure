@@ -22,7 +22,7 @@ exports.createClaim = async (req, res) => {
         const user = await User.findById(claim.memberId);
         if (user) {
             const emailService = require('../services/email.service');
-            emailService.sendClaimConfirmation(user.email, user.fullName, claim.issueType);
+            await emailService.sendClaimConfirmation(user.email, user.fullName, claim.issueType);
         }
 
         res.status(201).json(claim);
@@ -94,7 +94,7 @@ exports.updateClaimStatus = async (req, res) => {
         if (user) {
             const emailService = require('../services/email.service');
             const smsService = require('../services/sms.service');
-            emailService.sendClaimStatusUpdate(user.email, user.fullName, status);
+            await emailService.sendClaimStatusUpdate(user.email, user.fullName, status);
             smsService.sendClaimStatusUpdateSMS(user.phone, status);
         }
 

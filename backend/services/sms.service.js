@@ -25,6 +25,11 @@ exports.sendClaimStatusUpdateSMS = (phone, status) => {
     sendSMS(phone, body);
 };
 
+exports.sendEnrollmentConfirmationSMS = (phone, name) => {
+    const body = `Leak Assure: Welcome ${name}! Your protection plan is now active. You're covered!`;
+    sendSMS(phone, body);
+};
+
 exports.sendServiceScheduledSMS = (phone, date, vendor) => {
     const body = `Leak Assure: A service visit from ${vendor} has been scheduled for ${date}.`;
     sendSMS(phone, body);

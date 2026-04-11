@@ -1,28 +1,52 @@
-import { useState, useEffect, useRef } from "react";
-import { Search, MapPin, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { MapPin, Loader2 } from "lucide-react";
 
-interface PhotonFeature {
-    properties: {
-        name?: string;
-        street?: string;
-        housenumber?: string;
-        postcode?: string;
-        city?: string;
-        state?: string;
-        country?: string;
-        osm_id?: number;
-    };
-    geometry: {
-        coordinates: [number, number]; // [lon, lat]
-    };
-}
+const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as string | undefined;
 
 interface AddressAutocompleteProps {
     value: string;
-    onSelect: (address: string, lat?: number, lon?: number) => void;
+    onSelect: (address: string, components?: {
+        street: string;
+        city: string;
+        state: string;
+        zip: string;
+        country: string;
+        lat: number;
+        lng: number;
+    }) => void;
     placeholder?: string;
     className?: string;
     error?: boolean;
+}
+
+interface Suggestion {
+    description: string;
+    place_id: string;
+}
+
+// Helper to extract address component
+function getComponent(result: any, type: string, useShort = false): string {
+    const component = result.address_components?.find((c: any) => c.types.includes(type));
+    return useShort ? component?.short_name || "" : component?.long_name || "";
+}
+
+function loadGoogleMapsScript(apiKey: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const g = (window as any).google;
+        if (g?.maps?.places) { resolve(); return; }
+        if (document.getElementById("google-maps-script")) {
+            // Script is loading, queue callback
+            (window as any).initGooglePlaces = resolve;
+            return;
+        }
+        (window as any).initGooglePlaces = resolve;
+        const script = document.createElement("script");
+        script.id = "google-maps-script";
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGooglePlaces`;
+        script.async = true;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
 }
 
 export function AddressAutocomplete({
@@ -33,79 +57,107 @@ export function AddressAutocomplete({
     error = false,
 }: AddressAutocompleteProps) {
     const [query, setQuery] = useState(value);
-    const [suggestions, setSuggestions] = useState<PhotonFeature[]>([]);
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [googleReady, setGoogleReady] = useState(false);
+    const [hasSelected, setHasSelected] = useState(!!value);
     const containerRef = useRef<HTMLDivElement>(null);
+    const autocompleteServiceRef = useRef<any>(null);
+    const geocoderRef = useRef<any>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Sync query with external value (e.g. when form resets)
-    useEffect(() => {
-        setQuery(value);
+    // Sync query with external value
+    useEffect(() => { 
+        setQuery(value); 
+        if (value) setHasSelected(true);
     }, [value]);
 
-    // Handle click outside to close dropdown
+    // Load Google Maps or skip
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        if (!GOOGLE_API_KEY) return;
+        loadGoogleMapsScript(GOOGLE_API_KEY).then(() => {
+            const g = (window as any).google;
+            autocompleteServiceRef.current = new g.maps.places.AutocompleteService();
+            geocoderRef.current = new g.maps.Geocoder();
+            setGoogleReady(true);
+        }).catch((e: unknown) => console.error("Google Maps failed to load", e));
+    }, []);
+
+    // Handle click outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
                 setIsOpen(false);
+                // If the user clicks outside and hasn't selected, clear it (Force selection)
+                if (!hasSelected && query !== "") {
+                    setQuery("");
+                    onSelect("");
+                }
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [hasSelected, query, onSelect]);
 
-    // Debounced fetch from Photon API
-    useEffect(() => {
-        if (query.length < 3) {
+    const fetchSuggestions = useCallback((input: string) => {
+        if (!googleReady || !autocompleteServiceRef.current || input.length < 3) {
             setSuggestions([]);
-            setIsLoading(false);
             return;
         }
-
-        // Only fetch if query is different from the selected value
-        if (query === value) return;
-
-        const timer = setTimeout(async () => {
-            setIsLoading(true);
-            try {
-                const response = await fetch(
-                    `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`
-                );
-                const data = await response.json();
-                setSuggestions(data.features || []);
-                setIsOpen(true);
-            } catch (error) {
-                console.error("Photon API error:", error);
-                setSuggestions([]);
-            } finally {
+        setIsLoading(true);
+        autocompleteServiceRef.current.getPlacePredictions(
+            {
+                input,
+                componentRestrictions: { country: "us" },
+                types: ["address"],
+            },
+            (predictions, status) => {
                 setIsLoading(false);
+                if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
+                    setSuggestions(predictions.map(p => ({ description: p.description, place_id: p.place_id })));
+                    setIsOpen(true);
+                } else {
+                    setSuggestions([]);
+                }
             }
-        }, 400);
+        );
+    }, [googleReady]);
 
-        return () => clearTimeout(timer);
-    }, [query, value]);
+    useEffect(() => {
+        if (query === value) return;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => fetchSuggestions(query), 350);
+        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    }, [query, value, fetchSuggestions]);
 
-    const formatAddress = (feature: PhotonFeature) => {
-        const p = feature.properties;
-        const parts = [];
-
-        // Build address string: Name/Street Housenumber, City, State, Country
-        const streetPart = p.street ? `${p.street}${p.housenumber ? ` ${p.housenumber}` : ''}` : p.name;
-        if (streetPart) parts.push(streetPart);
-        if (p.city) parts.push(p.city);
-        if (p.state) parts.push(p.state);
-        if (p.country) parts.push(p.country);
-
-        return parts.join(", ");
-    };
-
-    const handleSelect = (feature: PhotonFeature) => {
-        const fullAddress = formatAddress(feature);
-        const [lon, lat] = feature.geometry.coordinates;
-
-        setQuery(fullAddress);
+    const handleSelect = async (suggestion: Suggestion) => {
+        setQuery(suggestion.description);
+        setHasSelected(true);
         setIsOpen(false);
-        onSelect(fullAddress, lat, lon);
+        setSuggestions([]);
+
+        if (geocoderRef.current) {
+            try {
+                const result = await geocoderRef.current.geocode({ placeId: suggestion.place_id });
+                if (result.results?.[0]) {
+                    const res = result.results[0];
+                    const loc = res.geometry.location;
+                    const components = {
+                        street: `${getComponent(res, "street_number")} ${getComponent(res, "route")}`.trim(),
+                        city: getComponent(res, "locality"),
+                        state: getComponent(res, "administrative_area_level_1", true),
+                        zip: getComponent(res, "postal_code"),
+                        country: getComponent(res, "country", true),
+                        lat: loc.lat(),
+                        lng: loc.lng(),
+                    };
+                    onSelect(suggestion.description, components);
+                    return;
+                }
+            } catch { /* fall through */ }
+        }
+        onSelect(suggestion.description);
     };
 
     return (
@@ -116,60 +168,57 @@ export function AddressAutocomplete({
                     value={query}
                     onChange={(e) => {
                         setQuery(e.target.value);
+                        setHasSelected(false);
                         if (e.target.value.length < 3) setIsOpen(false);
                     }}
-                    onFocus={() => {
-                        if (suggestions.length > 0) setIsOpen(true);
+                    onFocus={() => { if (suggestions.length > 0) setIsOpen(true); }}
+                    onBlur={() => {
+                        // Small delay to allow click on suggestion
+                        setTimeout(() => {
+                            if (!hasSelected && query !== "") {
+                                setQuery("");
+                                onSelect("");
+                            }
+                        }, 200);
                     }}
                     placeholder={placeholder}
                     className={`${className} pr-10`}
                     autoComplete="off"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <MapPin className="h-4 w-4" />
-                    )}
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
                 </div>
             </div>
 
-            {/* Suggestions Dropdown */}
-            {isOpen && (suggestions.length > 0) && (
+            {isOpen && suggestions.length > 0 && (
                 <div className="absolute left-0 right-0 mt-2 z-[1000] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                     <div className="py-1">
-                        {suggestions.map((feature, index) => (
+                        {suggestions.map((s) => (
                             <button
-                                key={`${feature.properties.osm_id}-${index}`}
+                                key={s.place_id}
                                 type="button"
-                                onClick={() => handleSelect(feature)}
+                                onClick={() => handleSelect(s)}
                                 className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors group border-b border-slate-50 last:border-0"
                             >
                                 <div className="mt-0.5 h-6 w-6 rounded-full bg-slate-50 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-50 transition-colors">
                                     <MapPin className="h-3 w-3 text-slate-400 group-hover:text-blue-500" />
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-bold text-slate-900 leading-tight">
-                                        {feature.properties.name || feature.properties.street || "Unnamed Location"}
-                                    </span>
-                                    <span className="text-[11px] font-medium text-slate-500 mt-0.5">
-                                        {[feature.properties.city, feature.properties.state, feature.properties.country].filter(Boolean).join(", ")}
-                                    </span>
-                                </div>
+                                <span className="text-sm text-slate-800 leading-snug">{s.description}</span>
                             </button>
                         ))}
                     </div>
-                    <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex items-center justify-between">
+                    <div className="bg-slate-50 px-4 py-2 border-t border-slate-100">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                            Search Results
+                            Powered by Google · U.S. Addresses Only
                         </span>
-                        <img
-                            src="https://photon.komoot.io/img/logo.png"
-                            alt="Photon"
-                            className="h-2 opacity-30 grayscale"
-                        />
                     </div>
                 </div>
+            )}
+
+            {!GOOGLE_API_KEY && (
+                <p className="mt-1 text-[10px] text-amber-600 font-medium">
+                    ⚠ Add VITE_GOOGLE_PLACES_API_KEY to .env for address autocomplete.
+                </p>
             )}
         </div>
     );

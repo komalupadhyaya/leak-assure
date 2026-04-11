@@ -1,7 +1,8 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.leakassure.com';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export interface SignupPayload {
-    fullName: string;
+    firstName: string;
+    lastName: string;
     email: string;
     phone: string;
     serviceAddress: string;
@@ -38,6 +39,14 @@ export interface SessionDetails {
     price: number;
     serviceAddress: string;
     waitingPeriodEnd: string;
+    token?: string;
+    user?: {
+        id: string;
+        email: string;
+        fullName: string;
+        role: string;
+        forcePasswordChange: boolean;
+    };
 }
 
 export async function getSessionDetails(sessionId: string): Promise<SessionDetails> {
@@ -324,3 +333,25 @@ export const changePassword = async (newPassword: string): Promise<{ message: st
 
     return response.json();
 };
+
+export async function createAdminUser(data: { fullName: string; email: string; password: string }) {
+    const token = localStorage.getItem('admin_token');
+    const res = await fetch(`${API_BASE}/api/admin/ph3/admin-users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed to create admin user'); }
+    return res.json();
+}
+
+export async function resetMemberPassword(memberId: string, newPassword: string) {
+    const token = localStorage.getItem('admin_token');
+    const res = await fetch(`${API_BASE}/api/admin/ph3/members/${memberId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ newPassword }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed to reset password'); }
+    return res.json();
+}

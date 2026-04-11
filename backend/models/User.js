@@ -3,7 +3,14 @@ const mongoose = require('mongoose');
 const UserSchema = new mongoose.Schema({
     fullName: {
         type: String,
-        required: true,
+        trim: true,
+    },
+    firstName: {
+        type: String,
+        trim: true,
+    },
+    lastName: {
+        type: String,
         trim: true,
     },
     email: {
@@ -23,6 +30,27 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: function () { return this.role === 'member'; },
         trim: true,
+    },
+    addressStreet: {
+        type: String,
+        trim: true,
+    },
+    addressCity: {
+        type: String,
+        trim: true,
+    },
+    addressState: {
+        type: String,
+        trim: true,
+    },
+    addressZip: {
+        type: String,
+        trim: true,
+    },
+    addressCountry: {
+        type: String,
+        trim: true,
+        default: 'US',
     },
     plan: {
         type: String,

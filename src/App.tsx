@@ -16,13 +16,8 @@ import Claims from "./pages/admin/Claims";
 import ClaimDetail from "./pages/admin/ClaimDetail";
 import Payments from "./pages/admin/Payments";
 import Vendors from "./pages/admin/Vendors";
-import { Affiliates, Settings as AdminSettings } from "./pages/admin/Placeholders";
-import Login from "./pages/auth/Login";
-import MemberDashboard from "./pages/member/Dashboard";
-import FileClaim from "./pages/member/FileClaim";
-import MemberSettings from "./pages/member/Settings";
-import ChangePassword from "./pages/member/ChangePassword";
 import AdminAffiliates from "./pages/admin/Affiliates";
+import AdminSettings from "./pages/admin/Settings";
 
 // Affiliate Portal
 import AffiliateLogin from "./pages/affiliate/AffiliateLogin";
@@ -35,11 +30,35 @@ import AffiliateSettings from "./pages/affiliate/AffiliateSettings";
 
 import { Navigate } from "react-router-dom";
 import AdminLogin from "./pages/admin/AdminLogin";
+import Login from "./pages/auth/Login";
+import MemberDashboard from "./pages/member/Dashboard";
+import CoverageTerms from "./pages/member/CoverageTerms";
+import FileClaim from "./pages/member/FileClaim";
+import MemberSettings from "./pages/member/Settings";
+import ChangePassword from "./pages/member/ChangePassword";
+
+// Helper to get cookie by name
+const getCookie = (name: string) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+};
 
 // Auth Guard Component
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole?: 'admin' | 'member' }) => {
   const adminToken = localStorage.getItem('admin_token');
-  const memberToken = localStorage.getItem('token');
+  let memberToken = localStorage.getItem('token');
+  
+  // If no member token in localStorage, check cookies (for cross-subdomain auto-login)
+  if (!memberToken) {
+    const cookieToken = getCookie('token');
+    if (cookieToken) {
+      memberToken = cookieToken;
+      localStorage.setItem('token', cookieToken);
+    }
+  }
+
   const adminUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
   const memberUser = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -49,16 +68,17 @@ const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode,
     return <>{children}</>;
   }
 
-  if (requiredRole === 'member') {
-    // Admins are allowed to view member routes as well (Improvement 1)
-    if (!memberToken && !adminToken) return <Navigate to="/login" replace />;
-
-    const currentUser = adminToken ? adminUser : memberUser;
-    // Basic check to ensure at least one valid session is active
-    if (!currentUser.role) return <Navigate to="/login" replace />;
-
-    return <>{children}</>;
+  // If we have a token but no user object in localStorage, we might need to fetch it
+  // But for now, if it's a member route, we just check if a token exists
+  if (!memberToken) {
+    console.log("No token found in localStorage or cookies. Redirecting to login.");
+    return <Navigate to="/login" replace />;
   }
+  
+  // Basic check to ensure at least one valid session is active
+  // If we have a token but user.role is missing, we still allow it for now 
+  // and handle profile fetching in the dashboard
+  if (!memberUser.role && !memberToken) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
 };
@@ -121,6 +141,7 @@ const App = () => (
 
           {/* Phase 4 Member Routes (Protected) */}
           <Route path="/member/dashboard" element={<ProtectedRoute requiredRole="member"><MemberDashboard /></ProtectedRoute>} />
+          <Route path="/coverage-terms" element={<ProtectedRoute requiredRole="member"><CoverageTerms /></ProtectedRoute>} />
           <Route path="/member/file-claim" element={<ProtectedRoute requiredRole="member"><FileClaim /></ProtectedRoute>} />
           <Route path="/member/settings" element={<ProtectedRoute requiredRole="member"><MemberSettings /></ProtectedRoute>} />
           <Route path="/member/change-password" element={<ProtectedRoute requiredRole="member"><ChangePassword /></ProtectedRoute>} />

@@ -51,6 +51,8 @@ const { generalLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 // Mount Stripe routes BEFORE express.json() to allow raw body for webhooks
 app.use('/api/stripe', stripeRoutes);
+app.use('/api/webhook', stripeRoutes); // Fallback mount point for legacy configs
+console.log("Stripe routes mounted on /api/stripe and /api/webhook");
 
 app.use(express.json());
 app.use(cookieParser());
@@ -105,6 +107,12 @@ app.use('/api/affiliates-admin', affiliateAdminRoutes);
 // Base Route for testing
 app.get('/', (req, res) => {
     res.send('Leak Assure Backend is Running...');
+});
+
+// 404 Handler
+app.use((req, res) => {
+    console.warn(`404 NOT FOUND: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: `Path ${req.originalUrl} not found on this server.` });
 });
 
 const PORT = process.env.PORT || 5000;
