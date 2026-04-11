@@ -79,6 +79,15 @@ exports.login = async (req, res) => {
 
         const token = jwt.sign({ id: user._id, email: user.email, role: user.role || 'member' }, JWT_SECRET, { expiresIn: '7d' });
 
+        // Set cookie for cross-subdomain auto-login
+        res.cookie('token', token, {
+            httpOnly: false, // Set to false so frontend can read it for cross-subdomain auto-login
+            secure: true,
+            sameSite: 'none',
+            domain: process.env.COOKIE_DOMAIN || '.leakassure.com',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+
         res.json({
             token,
             user: {

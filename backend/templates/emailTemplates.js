@@ -19,7 +19,7 @@ exports.paymentFailedEmail = (name) => ({
             <p>Hi ${name},</p>
             <p>We were unable to process your recent payment for your Leak Assure subscription.</p>
             <p>To keep your protection active, please update your payment method in the Member Portal as soon as possible.</p>
-            <a href="https://member.leakassure.com/login" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Update Payment Method</a>
+            <a href="${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}/login" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Update Payment Method</a>
             <p style="margin-top: 30px;">Thank you,<br>The Leak Assure Team</p>
         </div>
     `
@@ -46,7 +46,7 @@ exports.affiliateStatusEmail = (name, status) => ({
             <p>Hi ${name},</p>
             <p>Your application to the Leak Assure Affiliate Program has been <strong>${status}</strong>.</p>
             ${status === 'approved' 
-                ? '<p>You can now log in to the Affiliate Portal to access your referral links and assets.</p><a href="https://affiliates.leakassure.com/login" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Go to Affiliate Portal</a>' 
+                ? `<p>You can now log in to the Affiliate Portal to access your referral links and assets.</p><a href="${process.env.FRONTEND_AFFILIATE_URL || 'https://affiliates.leakassure.com'}/login" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">Go to Affiliate Portal</a>` 
                 : '<p>If you have any questions, please reply to this email.</p>'}
             <p style="margin-top: 30px;">Thank you,<br>The Leak Assure Team</p>
         </div>
