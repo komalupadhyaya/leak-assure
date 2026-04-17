@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.leakassure.com';
 
 export interface SignupPayload {
     firstName: string;
@@ -224,17 +224,19 @@ export async function getMyProfile() {
     return res.json();
 }
 
-export async function fileMemberClaim(claimData: any) {
+export async function fileMemberClaim(formData: FormData) {
     const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/member/claim`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(claimData),
+        body: formData,
     });
-    if (!res.ok) throw new Error('Failed to file claim');
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to file claim');
+    }
     return res.json();
 }
 

@@ -4,9 +4,11 @@ const memberController = require('../controllers/member.controller');
 const stripeController = require('../controllers/stripe.controller');
 const auth = require('../middleware/auth.middleware');
 
+const upload = require('../services/upload.service');
+
 router.get('/me', auth, memberController.getMe);
 router.get('/claims', auth, memberController.getMemberClaims);
-router.post('/claim', auth, memberController.memberFileClaim);
+router.post('/claim', auth, upload.array('photos', 5), memberController.memberFileClaim);
 router.post('/cancel', auth, memberController.memberCancelSubscription);
 router.post('/billing-portal', auth, stripeController.createBillingPortal);
 

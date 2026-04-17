@@ -21,13 +21,13 @@ exports.memberFileClaim = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
         if (!user) {
-            console.log("Claim attempt rejected: User not found");
+
             return res.status(404).json({ error: 'User not found' });
         }
 
         // --- RULE 1: ROLE PROTECTION ---
         if (user.role !== 'member') {
-            console.log(`Claim rejection: Admin attempt by ${user.email}`);
+
             return res.status(403).json({
                 error: "Only members can submit claims."
             });
@@ -35,7 +35,7 @@ exports.memberFileClaim = async (req, res) => {
 
         // --- RULE 2: WAITING PERIOD ENFORCEMENT ---
         if (user.waitingPeriodEnd && new Date() < user.waitingPeriodEnd) {
-            console.log(`Claim rejection: Waiting period not ended for ${user.email}`);
+
             return res.status(403).json({
                 error: "Coverage has not started yet. Claims can be submitted after the waiting period."
             });
@@ -46,7 +46,7 @@ exports.memberFileClaim = async (req, res) => {
         if (lastClaim) {
             const secondsSinceLastClaim = (new Date().getTime() - new Date(lastClaim.createdAt).getTime()) / 1000;
             if (secondsSinceLastClaim < 30) {
-                console.log(`Claim rejection: Duplicate attempt by ${user.email} (${Math.round(secondsSinceLastClaim)}s since last)`);
+
                 return res.status(429).json({
                     error: "A claim was recently submitted. Please wait a moment before submitting another."
                 });
@@ -66,7 +66,7 @@ exports.memberFileClaim = async (req, res) => {
         const allowedClaims = user.plan === 'premium' ? 2 : 2;
 
         if (claimsThisYear >= allowedClaims) {
-            console.log(`Claim rejection: Yearly limit reached for ${user.email} (${user.plan})`);
+
             return res.status(403).json({
                 error: "You have reached the maximum number of claims allowed for your plan this year."
             });
@@ -75,10 +75,12 @@ exports.memberFileClaim = async (req, res) => {
         // --- RULE 5: PLAN DETAILS ENRICHMENT ---
         const serviceFee = user.plan === 'premium' ? 125 : 99;
 
-        console.log(`Attempting to send email for claim by: ${user.email}`);
 
+
+        const photos = req.files ? req.files.map(f => f.path) : [];
         const claim = new Claim({
             ...req.body,
+            photos,
             memberId: user._id,
             memberName: user.fullName,
             serviceAddress: user.serviceAddress,
@@ -89,7 +91,10 @@ exports.memberFileClaim = async (req, res) => {
 
         await claim.save();
 
-        console.log(`Claim submission success for: ${user.email}`);
+
+        // Send confirmation email
+        const emailService = require('../services/email.service');
+        await emailService.sendClaimConfirmation(user.email, user.fullName, claim.leakType, claim._id);
 
         res.status(201).json({
             success: true,
@@ -98,6 +103,9 @@ exports.memberFileClaim = async (req, res) => {
         });
     } catch (error) {
         console.error('Error filing member claim:', error);
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Internal server error' });
     }
 };

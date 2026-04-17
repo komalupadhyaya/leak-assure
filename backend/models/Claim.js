@@ -14,7 +14,30 @@ const ClaimSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    issueType: {
+    leakType: {
+        type: String,
+        required: true
+    },
+    room: {
+        type: String,
+        required: true
+    },
+    floorLevel: {
+        type: String,
+        required: true
+    },
+    specificLocation: {
+        type: String
+    },
+    isActiveLeak: {
+        type: String,
+        required: true
+    },
+    dateFirstNoticed: {
+        type: Date,
+        required: true
+    },
+    leakDuration: {
         type: String,
         required: true
     },
@@ -22,6 +45,20 @@ const ClaimSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    attemptedRepairs: {
+        type: String,
+        required: true
+    },
+    repairDetails: {
+        type: String
+    },
+    callbackPhone: {
+        type: String,
+        required: true
+    },
+    bestTimeToReach: [{
+        type: String
+    }],
     status: {
         type: String,
         enum: ['new', 'under_review', 'approved', 'denied', 'scheduled', 'completed', 'closed'],

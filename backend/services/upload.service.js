@@ -7,6 +7,8 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+
+
 const storage = multer.memoryStorage();
 const multerUpload = multer({
     storage: storage,
@@ -42,7 +44,11 @@ const uploadToCloudinary = (req, res, next) => {
         .then(() => next())
         .catch(err => {
             console.error('Cloudinary upload error:', err);
-            res.status(500).json({ error: 'Failed to upload images to Cloudinary' });
+            const errorMessage = err.message || (typeof err === 'string' ? err : 'Unknown Cloudinary error');
+            res.status(500).json({ 
+                error: 'Failed to upload images to Cloudinary',
+                details: errorMessage
+            });
         });
 };
 

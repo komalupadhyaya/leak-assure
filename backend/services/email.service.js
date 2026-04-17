@@ -20,7 +20,7 @@ const getTransporter = () => {
             },
         });
 
-        console.log(`[SMTP] Transporter initialized for ${process.env.SMTP_HOST || 'smtp.gmail.com'}`);
+
     }
     return transporter;
 };
@@ -31,13 +31,11 @@ const EMAIL_FROM = process.env.EMAIL_FROM || 'support@leakassure.com';
  * Core SMTP Sender Helper
  */
 const sendEmail = async ({ to, subject, html, text }) => {
-    console.log(`\n--- INITIATING EMAIL SEND (SMTP) ---`);
-    console.log(`To: ${to}`);
-    console.log(`Subject: ${subject}`);
+    
     
     try {
         const mailTransporter = getTransporter();
-        console.log(`[SMTP] Sending email via nodemailer...`);
+        
         
         const info = await mailTransporter.sendMail({
             from: `Leak Assure <${EMAIL_FROM}>`,
@@ -47,14 +45,14 @@ const sendEmail = async ({ to, subject, html, text }) => {
             html,
         });
 
-        console.log(`[SMTP Success] Message ID: ${info.messageId}`);
+        
         return info;
     } catch (error) {
         console.error('[Email Service Exception]:', error.message);
         console.error(error.stack);
         return null;
     } finally {
-        console.log(`--- EMAIL SEND PROCESS FINISHED ---\n`);
+        
     }
 };
 
@@ -70,14 +68,41 @@ exports.sendSignupConfirmation = async (email, name) => {
     });
 };
 
-exports.sendClaimConfirmation = async (email, name, issueType) => {
-    const subject = `Claim Received: ${issueType}`;
-    const html = `<h2>Claim Received</h2><p>Hi ${name}, we are processing your ${issueType} request.</p>`;
+exports.sendClaimConfirmation = async (email, name, issueType, claimId) => {
+    const subject = `Claim Received: #${claimId.toString().slice(-6).toUpperCase()} - ${issueType}`;
+    
+    const html = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; background-color: #f8fafc; padding: 40px 20px;">
+            <div style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <div style="background-color: #2563eb; padding: 40px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800;">Claim Registered</h1>
+                    <p style="color: #bfdbfe; margin-top: 8px; font-size: 16px;">Claim ID: #${claimId}</p>
+                </div>
+                
+                <div style="padding: 40px;">
+                    <p style="font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">Hi ${name},</p>
+                    <p style="font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">We have received your claim for <strong>${issueType}</strong>. Our team of specialists is currently reviewing the details and will contact you shortly to coordinate the repair.</p>
+                    
+                    <div style="background-color: #f1f5f9; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+                        <h2 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin: 0 0 16px 0;">What Happens Next?</h2>
+                        <ol style="padding-left: 20px; color: #1e293b; font-size: 14px; line-height: 1.6;">
+                            <li>A Case Manager will review your photos and description.</li>
+                            <li>A local pro will be dispatched to your service address.</li>
+                            <li>We will handle the coordination and payment directly.</li>
+                        </ol>
+                    </div>
+
+                    <p style="font-size: 14px; color: #64748b; margin: 0; line-height: 1.5; text-align: center;">If you have immediate questions, please call our 24/7 hotline with your Claim ID: #${claimId}</p>
+                </div>
+            </div>
+        </div>
+    `;
+
     return await sendEmail({
         to: email,
         subject,
         html,
-        text: `Hi ${name}, we received your claim for ${issueType}.`
+        text: `Hi ${name}, we received your claim #${claimId} for ${issueType}.`
     });
 };
 
