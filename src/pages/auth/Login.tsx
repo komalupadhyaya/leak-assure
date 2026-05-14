@@ -92,8 +92,8 @@ const Login = () => {
                     <div className="flex items-center gap-3 bg-blue-50 p-4 rounded-2xl border border-blue-100">
                         <AlertCircle className="h-5 w-5 text-blue-600 shrink-0" />
                         <p className="text-[11px] text-blue-800 leading-tight">
-                            Don't have an account? Your login is created as part of the <a 
-                                href="/" 
+                            Don't have an account? Your login is created as part of the <a
+                                href={`${import.meta.env.VITE_FRONTEND_SIGNUP_URL || 'https://signup.leakassure.com'}/`}
                                 className="font-bold underline"
                             >home protection signup</a>.
                         </p>

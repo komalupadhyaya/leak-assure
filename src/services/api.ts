@@ -11,6 +11,7 @@ export interface SignupPayload {
     password?: string;
     latitude?: number;
     longitude?: number;
+    ref?: string;
 }
 
 export interface SignupResponse {

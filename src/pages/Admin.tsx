@@ -93,8 +93,7 @@ const Admin = () => {
                 type="button"
                 variant="ghost"
                 className="w-full text-muted-foreground hover:text-foreground"
-                // onClick={() => window.location.href = "/"}
-                onClick={() => window.location.href = "https://signup.leakassure.com"}
+                onClick={() => window.location.href = import.meta.env.VITE_FRONTEND_SIGNUP_URL || "https://signup.leakassure.com"}
               >
                 Return to Home
               </Button>

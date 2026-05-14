@@ -275,6 +275,9 @@ export function SignupForm() {
         setIsSubmitting(true);
         setErrors({});
 
+        const refCode = document.cookie.split('; ').find(row => row.startsWith('la_ref='))?.split('=')[1];
+        console.log(`[Signup] Submitting with referral code: ${refCode || 'None'}`);
+
         try {
             const { url } = await startSignup({
                 firstName: form.firstName.trim(),
@@ -287,6 +290,7 @@ export function SignupForm() {
                 password: form.password,
                 latitude: form.latitude,
                 longitude: form.longitude,
+                ref: refCode
             });
             window.location.href = url;
         } catch (err: unknown) {

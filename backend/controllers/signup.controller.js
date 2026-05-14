@@ -124,6 +124,7 @@ exports.startSignup = async (req, res) => {
 
         // --- REFERRAL TRACKING ---
         const refCode = req.body.ref || (req.cookies && req.cookies.la_ref);
+        console.log(`[Signup Controller] Processing referral code: ${refCode || 'None'}`);
         if (refCode) {
             try {
                 const affiliate = await Affiliate.findOne({ referralCode: refCode, status: 'approved' });

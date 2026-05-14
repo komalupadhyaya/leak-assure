@@ -14,8 +14,10 @@ const NotFound = () => {
         <h1 className="mb-4 text-4xl font-bold">404</h1>
         <p className="mb-4 text-xl text-muted-foreground">Oops! Page not found</p>
         {/* <a href="/" className="text-primary underline hover:text-primary/90"> */}
-        <a href="https://signup.leakassure.com" className="text-primary underline hover:text-primary/90">
-
+        <a 
+          href={import.meta.env.VITE_FRONTEND_SIGNUP_URL || "https://signup.leakassure.com"} 
+          className="text-primary underline hover:text-primary/90"
+        >
           Return to Home
         </a>
       </div>

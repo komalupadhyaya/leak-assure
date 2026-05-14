@@ -25,9 +25,10 @@ export default function ReferralRedirect() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data.referralCode) {
-                        // Set the cookie
-                        document.cookie = `la_ref=${data.referralCode}; path=/; max-age=${60 * 60 * 24 * 1}; SameSite=Lax`;
-                        console.log(`[Referral] Applied slug: ${slug}, code: ${data.referralCode}`);
+                        // Set the cookie on the root domain so it works across subdomains (admin, signup, member, etc.)
+                        const domain = window.location.hostname.includes("leakassure.com") ? "; domain=.leakassure.com" : "";
+                        document.cookie = `la_ref=${data.referralCode}; path=/; max-age=${60 * 60 * 24 * 1}; SameSite=Lax${domain}`;
+                        console.log(`[Referral] Applied slug: ${slug}, code: ${data.referralCode}${domain}`);
                     }
                 }
             } catch (err) {
