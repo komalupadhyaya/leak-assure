@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Droplets, LayoutDashboard, Users, DollarSign, Image, Settings, LogOut, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { affiliateLogout, affiliateGetMe } from "@/services/affiliateApi";
 
 const navItems = [
     { to: "/affiliate/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,10 +15,22 @@ export default function AffiliateLayout({ children }: { children: React.ReactNod
     const location = useLocation();
     const navigate = useNavigate();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [profile, setProfile] = useState<any>(null);
 
-    const handleLogout = () => {
-        localStorage.removeItem("affiliate_token");
-        localStorage.removeItem("affiliate_user");
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const data = await affiliateGetMe();
+                setProfile(data);
+            } catch (error) {
+                console.error("Error fetching affiliate profile:", error);
+            }
+        };
+        fetchProfile();
+    }, []);
+
+    const handleLogout = async () => {
+        await affiliateLogout();
         navigate("/affiliate/login");
     };
 

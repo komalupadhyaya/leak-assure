@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const Affiliate = require('../models/Affiliate');
+const emailService = require('../services/email.service');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_key';
 
@@ -30,6 +31,26 @@ exports.affiliateSignup = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         const affiliate = new Affiliate({ name, email, password: hashedPassword, paypalEmail, zelleInfo });
         await affiliate.save();
+
+        // Generate and save the personalized referral slug separately (safe, outside save hook)
+        try {
+            const slug = await Affiliate.generateUniqueSlug(name);
+            if (slug) {
+                affiliate.referralSlug = slug;
+                await affiliate.save();
+            }
+        } catch (slugErr) {
+            // Non-critical: slug generation failure should not block signup
+            console.error('[AffiliateSignup] Slug generation error (non-critical):', slugErr.message);
+        }
+
+        // Send notifications
+        try {
+            await emailService.sendAffiliateWelcomeEmail(affiliate);
+            await emailService.sendNewAffiliateAdminNotification(affiliate);
+        } catch (emailErr) {
+            console.error('[AffiliateSignup] Email Error:', emailErr.message);
+        }
 
         return res.status(201).json({
             message: 'Account created. Your application is pending admin approval.',
@@ -72,8 +93,14 @@ exports.affiliateLogin = async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        res.cookie('affiliate_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
         return res.json({
-            token,
             affiliate: {
                 id: affiliate._id,
                 name: affiliate.name,
@@ -84,6 +111,29 @@ exports.affiliateLogin = async (req, res) => {
         });
     } catch (err) {
         console.error('[AffiliateLogin] Error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.affiliateLogout = (req, res) => {
+    res.clearCookie('affiliate_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+    res.json({ message: 'Logged out successfully' });
+};
+
+exports.getAffiliateBySlug = async (req, res) => {
+    try {
+        const { slug } = req.params;
+        const affiliate = await Affiliate.findOne({ referralSlug: slug, status: 'approved' });
+        if (!affiliate) {
+            return res.status(404).json({ error: 'Affiliate not found' });
+        }
+        return res.json({ referralCode: affiliate.referralCode });
+    } catch (err) {
+        console.error('[AffiliateSlug] Error:', err);
         return res.status(500).json({ error: 'Internal server error' });
     }
 };

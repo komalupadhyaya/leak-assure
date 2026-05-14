@@ -9,7 +9,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "dev": "nodemon server.js",
+    "dev": "nodemon --ext js,json,env server.js",
     "build": "echo 'No build step required for backend'"
   },
   "keywords": [],
@@ -28,10 +28,10 @@
     "mongoose": "^9.2.1",
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
-    "nodemailer": "^8.0.5",
     "stripe": "^20.3.1",
     "twilio": "^5.12.2",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "resend": "^3.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

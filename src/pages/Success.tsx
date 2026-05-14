@@ -27,18 +27,12 @@ const Success = () => {
         const data = await getSessionDetails(sessionId);
         setDetails(data);
         
-        if (data.token && data.user) {
-          console.log("Session verified, storing credentials...");
-          localStorage.setItem('token', data.token);
+        if (data.user) {
+          console.log("Session verified, storing user profile...");
+          // Token is set as httpOnly cookie by the backend.
+          // We only store the non-sensitive user profile for the route guard.
           localStorage.setItem('user', JSON.stringify(data.user));
           
-          // Set cookie for cross-subdomain support (if not on localhost)
-          if (!window.location.hostname.includes('localhost')) {
-              const domain = window.location.hostname.split('.').slice(-2).join('.');
-              document.cookie = `token=${data.token}; path=/; domain=.${domain}; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
-          }
-          
-          // Force a small delay to ensure localStorage/cookies are committed before we start countdown
           timerRef.current = setInterval(() => {
             setCountdown((prev) => {
               if (prev <= 1) {
@@ -54,7 +48,7 @@ const Success = () => {
             });
           }, 1000);
         } else {
-          console.warn("No token or user data returned for session.");
+          console.warn("No user data returned for session.");
         }
       } catch (err) {
         console.error("Error fetching session details:", err);
@@ -187,7 +181,7 @@ const Success = () => {
               </div>
 
               {/* Countdown for auto-redirect */}
-              {details?.token && (
+              {details?.user && (
                 <div className="text-center py-2">
                   <p className="text-xs text-slate-400 font-medium animate-pulse">
                     Auto-redirecting to Member Portal in {countdown}s...

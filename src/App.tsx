@@ -8,6 +8,7 @@ import Success from "./pages/Success";
 import Cancel from "./pages/Cancel";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import ReferralRedirect from "./components/ReferralRedirect";
 
 import Dashboard from "./pages/admin/Dashboard";
 import Members from "./pages/admin/Members";
@@ -37,56 +38,84 @@ import FileClaim from "./pages/member/FileClaim";
 import MemberSettings from "./pages/member/Settings";
 import ChangePassword from "./pages/member/ChangePassword";
 
-// Helper to get cookie by name
-const getCookie = (name: string) => {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split(';').shift();
-  return null;
-};
+
+import { useState, useEffect } from "react";
+import { adminGetMe, getMyProfile } from "./services/api";
+import { affiliateGetMe } from "./services/affiliateApi";
 
 // Auth Guard Component
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole?: 'admin' | 'member' }) => {
-  const adminToken = localStorage.getItem('admin_token');
-  let memberToken = localStorage.getItem('token');
-  
-  // If no member token in localStorage, check cookies (for cross-subdomain auto-login)
-  if (!memberToken) {
-    const cookieToken = getCookie('token');
-    if (cookieToken) {
-      memberToken = cookieToken;
-      localStorage.setItem('token', cookieToken);
-    }
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const pathname = window.location.pathname;
+
+  useEffect(() => {
+    const verifySession = async () => {
+      try {
+        if (requiredRole === 'admin') {
+          await adminGetMe();
+        } else {
+          await getMyProfile();
+        }
+        setIsAuthenticated(true);
+      } catch (error) {
+        setIsAuthenticated(false);
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+    verifySession();
+  }, [requiredRole, pathname]);
+
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
-  const adminUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
-  const memberUser = JSON.parse(localStorage.getItem('user') || '{}');
-
   if (requiredRole === 'admin') {
-    if (!adminToken) return <Navigate to="/admin/login" replace />;
-    if (adminUser.role !== 'admin') return <Navigate to="/login" replace />;
+    if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
     return <>{children}</>;
   }
 
-  // If we have a token but no user object in localStorage, we might need to fetch it
-  // But for now, if it's a member route, we just check if a token exists
-  if (!memberToken) {
-    console.log("No token found in localStorage or cookies. Redirecting to login.");
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
-  // Basic check to ensure at least one valid session is active
-  // If we have a token but user.role is missing, we still allow it for now 
-  // and handle profile fetching in the dashboard
-  if (!memberUser.role && !memberToken) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
 };
 
 // Affiliate Auth Guard
 const AffiliateProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const token = localStorage.getItem('affiliate_token');
-  if (!token) return <Navigate to="/affiliate/login" replace />;
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const pathname = window.location.pathname;
+
+  useEffect(() => {
+    const verifySession = async () => {
+      try {
+        await affiliateGetMe();
+        setIsAuthenticated(true);
+      } catch (error) {
+        setIsAuthenticated(false);
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+    verifySession();
+  }, [pathname]);
+
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return <Navigate to="/affiliate/login" replace />;
   return <>{children}</>;
 };
 
@@ -155,6 +184,9 @@ const App = () => (
           <Route path="/affiliate/commissions" element={<AffiliateProtectedRoute><AffiliateCommissions /></AffiliateProtectedRoute>} />
           <Route path="/affiliate/marketing" element={<AffiliateProtectedRoute><AffiliateCreatives /></AffiliateProtectedRoute>} />
           <Route path="/affiliate/settings" element={<AffiliateProtectedRoute><AffiliateSettings /></AffiliateProtectedRoute>} />
+          
+          {/* Custom Referral Slug Route (Catch-all for short links) */}
+          <Route path="/:slug" element={<ReferralRedirect />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

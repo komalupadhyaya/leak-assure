@@ -1,5 +1,6 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { adminLogout, adminGetMe } from "@/services/api";
 import {
     Users,
     FileText,
@@ -17,6 +18,19 @@ interface AdminLayoutProps {
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
     const location = useLocation();
+    const [profile, setProfile] = useState<any>(null);
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const data = await adminGetMe();
+                setProfile(data);
+            } catch (error) {
+                console.error("Error fetching admin profile:", error);
+            }
+        };
+        fetchProfile();
+    }, []);
 
     const menuItems = [
         { title: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
@@ -30,9 +44,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
     const currentTitle = menuItems.find(i => i.path === location.pathname)?.title || "Admin";
 
-    const handleLogout = () => {
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_user');
+    const handleLogout = async () => {
+        await adminLogout();
         window.location.href = '/admin/login';
     };
 
@@ -41,10 +54,14 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             <ResponsiveSidebar
                 items={menuItems}
                 theme="dark"
-                user={{
-                    name: "Admin User",
-                    email: "admin@leakassure.com",
-                    initials: "AD"
+                user={profile ? {
+                    name: profile.fullName,
+                    email: profile.email,
+                    initials: profile.fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+                } : {
+                    name: "Loading...",
+                    email: "",
+                    initials: ".."
                 }}
                 onLogout={handleLogout}
             />

@@ -1,6 +1,6 @@
+import { Link } from "react-router-dom";
 import { Droplets } from "lucide-react";
 import SignupForm from "@/components/SignupForm";
-import AffiliateLogin from "./affiliate/AffiliateLogin";
 
 const Index = () => {
   return (
@@ -38,7 +38,7 @@ const Index = () => {
             <p className="text-sm text-slate-500 font-medium">
               Already have an account?{" "}
               <a
-                href="https://member.leakassure.com/login"
+                href={`${import.meta.env.VITE_FRONTEND_MEMBER_URL || ''}/login`}
                 className="text-blue-600 font-bold hover:underline underline-offset-4"
               >
                 Sign In

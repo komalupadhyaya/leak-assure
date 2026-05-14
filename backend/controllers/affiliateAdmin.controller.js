@@ -47,12 +47,38 @@ exports.updateAffiliateStatus = async (req, res) => {
         const affiliate = await Affiliate.findByIdAndUpdate(req.params.id, { status }, { new: true }).select('-password');
         if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
         
-        // NOTIFY AFFILIATE
-        await emailService.sendAffiliateStatusUpdate(affiliate.email, affiliate.name, status);
+        // NOTIFY AFFILIATE (run in background)
+        emailService.sendAffiliateStatusUpdate(affiliate.email, affiliate.name, status)
+            .catch(err => console.error('[Email Failed]', err));
         
         return res.json(affiliate);
     } catch (err) {
         console.error('[AffiliateAdmin.updateStatus]', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// PATCH /api/admin/affiliates/:id/commission
+exports.updateAffiliateCommission = async (req, res) => {
+    try {
+        const { commissionType, commissionValue } = req.body;
+        if (!['fixed', 'percentage'].includes(commissionType)) {
+            return res.status(400).json({ error: 'Invalid commission type' });
+        }
+        if (typeof commissionValue !== 'number' || commissionValue < 0) {
+            return res.status(400).json({ error: 'Invalid commission value' });
+        }
+
+        const affiliate = await Affiliate.findByIdAndUpdate(
+            req.params.id, 
+            { commissionType, commissionValue }, 
+            { new: true }
+        ).select('-password');
+        
+        if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
+        return res.json(affiliate);
+    } catch (err) {
+        console.error('[AffiliateAdmin.updateCommissionSettings]', err);
         return res.status(500).json({ error: 'Internal server error' });
     }
 };

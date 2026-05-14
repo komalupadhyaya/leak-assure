@@ -172,10 +172,16 @@ const Members = () => {
                                     filteredMembers.map((member) => {
                                         const wpStatus = getWaitingPeriodStatus(member);
                                         return (
-                                            <tr key={member._id} className="hover:bg-slate-50 transition-colors">
+                                            <tr
+                                                key={member._id}
+                                                onClick={() => navigate(`/admin/members/${member._id}`)}
+                                                className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                                            >
                                                 {/* Member Name */}
                                                 <td className="px-5 py-3.5">
-                                                    <span className="font-semibold text-slate-900">{member.fullName}</span>
+                                                    <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                                                        {member.fullName}
+                                                    </span>
                                                 </td>
                                                 {/* Email */}
                                                 <td className="px-5 py-3.5 text-slate-600 max-w-[160px]">
@@ -221,10 +227,10 @@ const Members = () => {
                                                     {member.lastPaymentDate ? new Date(member.lastPaymentDate).toLocaleDateString() : "—"}
                                                 </td>
                                                 {/* Actions dropdown */}
-                                                <td className="px-5 py-3.5 text-right">
+                                                <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
-                                                            <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
+                                                            <button className="p-1.5 rounded-md hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors">
                                                                 <MoreHorizontal className="h-4 w-4" />
                                                             </button>
                                                         </DropdownMenuTrigger>

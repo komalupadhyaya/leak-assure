@@ -12,7 +12,38 @@ exports.getMe = async (req, res) => {
         if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
 
         // Earnings summary
-        const commissions = await Commission.find({ affiliateId: affiliate._id });
+        let commissions = await Commission.find({ affiliateId: affiliate._id });
+        
+        // --- AUTO-REPAIR: Check for active referrals missing commissions ---
+        const activeReferrals = await Referral.find({ 
+            affiliateId: affiliate._id 
+        }).populate('referredUserId');
+
+        for (const ref of activeReferrals) {
+            if (ref.referredUserId?.subscriptionStatus === 'active') {
+                const hasCommission = commissions.find(c => c.referralId.toString() === ref._id.toString());
+                if (!hasCommission) {
+                    console.log(`[Auto-Repair] Creating missing commission for referral: ${ref._id}`);
+                    
+                    let amount = affiliate.commissionValue || 20;
+                    if (affiliate.commissionType === 'percentage') {
+                        const planPrice = ref.referredUserId.planPrice || (ref.referredUserId.plan === 'premium' ? 49 : 29);
+                        amount = (planPrice * amount) / 100;
+                    }
+
+                    const newComm = new Commission({
+                        affiliateId: affiliate._id,
+                        referralId: ref._id,
+                        amount: amount,
+                        status: 'pending'
+                    });
+                    await newComm.save();
+                    // Refresh commissions list
+                    commissions = await Commission.find({ affiliateId: affiliate._id });
+                }
+            }
+        }
+
         const totalEarnings = commissions.reduce((sum, c) => sum + c.amount, 0);
         const paidEarnings = commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
         const availableBalance = commissions.filter(c => c.status === 'approved').reduce((sum, c) => sum + c.amount, 0);
@@ -20,7 +51,9 @@ exports.getMe = async (req, res) => {
 
         return res.json({
             affiliate,
-            referralLink: `${SIGNUP_BASE_URL}/?ref=${affiliate.referralCode}`,
+            referralLink: affiliate.referralSlug 
+                ? `${SIGNUP_BASE_URL}/${affiliate.referralSlug}`
+                : `${SIGNUP_BASE_URL}/?ref=${affiliate.referralCode}`,
             earnings: { totalEarnings, paidEarnings, availableBalance, totalReferrals }
         });
     } catch (err) {
@@ -34,7 +67,7 @@ exports.getReferrals = async (req, res) => {
     try {
         const referrals = await Referral.find({ affiliateId: req.affiliate.id })
             .sort({ createdAt: -1 })
-            .populate('referredUserId', 'fullName email');
+            .populate('referredUserId', 'fullName email subscriptionStatus');
 
         return res.json(referrals);
     } catch (err) {

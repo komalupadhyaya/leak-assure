@@ -10,6 +10,7 @@ router.use(adminAuth);
 router.get('/', ctrl.getAllAffiliates);
 router.get('/:id', ctrl.getAffiliateDetail);
 router.patch('/:id/status', ctrl.updateAffiliateStatus);
+router.patch('/:id/commission', ctrl.updateAffiliateCommission);
 router.post('/:id/payouts', ctrl.createPayout);
 
 // Commissions

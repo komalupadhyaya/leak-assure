@@ -5,13 +5,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_key';
 
 const adminAuth = async (req, res, next) => {
     try {
-        // 1. Get token from header
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        // 1. Get token from cookie or header
+        const token = req.cookies?.admin_token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
+
+        if (!token) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-
-        const token = authHeader.split(' ')[1];
 
         // 2. Verify token
         const decoded = jwt.verify(token, JWT_SECRET);

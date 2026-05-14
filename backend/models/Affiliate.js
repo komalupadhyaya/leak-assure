@@ -31,10 +31,24 @@ const AffiliateSchema = new mongoose.Schema({
         type: String,
         unique: true,
     },
+    referralSlug: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
     status: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending',
+    },
+    commissionType: {
+        type: String,
+        enum: ['fixed', 'percentage'],
+        default: 'percentage',
+    },
+    commissionValue: {
+        type: Number,
+        default: 20, // 20% by default
     },
     createdAt: {
         type: Date,
@@ -48,5 +62,29 @@ AffiliateSchema.pre('save', function () {
         this.referralCode = crypto.randomBytes(5).toString('hex');
     }
 });
+
+// Static helper: generate a unique slug for a given name
+AffiliateSchema.statics.generateUniqueSlug = async function (name) {
+    let slug = name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    if (!slug) return null;
+
+    let existing = await this.findOne({ referralSlug: slug });
+    let counter = 1;
+    const originalSlug = slug;
+
+    while (existing) {
+        slug = `${originalSlug}-${counter}`;
+        existing = await this.findOne({ referralSlug: slug });
+        counter++;
+    }
+
+    return slug;
+};
 
 module.exports = mongoose.model('Affiliate', AffiliateSchema);

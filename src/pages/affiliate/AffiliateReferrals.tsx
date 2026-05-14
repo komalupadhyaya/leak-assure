@@ -31,7 +31,7 @@ export default function AffiliateReferrals() {
                             <table className="min-w-full">
                                 <thead className="bg-slate-50 border-b border-slate-100">
                                     <tr>
-                                        {["Date", "Referred Member", "Converted", "Status"].map(h => (
+                                        {["Date", "Name", "Referred Member", "Converted", "Status"].map(h => (
                                             <th key={h} className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
                                         ))}
                                     </tr>
@@ -40,13 +40,16 @@ export default function AffiliateReferrals() {
                                     {referrals.map((r, i) => (
                                         <tr key={i} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-5 py-4 text-sm text-slate-600">{new Date(r.createdAt).toLocaleDateString()}</td>
-                                            <td className="px-5 py-4 text-sm font-medium text-slate-900">
+                                            <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                                                {r.referredUserId?.fullName || "—"}
+                                            </td>
+                                            <td className="px-5 py-4 text-sm text-slate-500">
                                                 {r.referredEmail ? r.referredEmail.replace(/(.{2}).*(@.*)/, '$1***$2') : "Anonymous"}
                                             </td>
-                                            <td className="px-5 py-4 text-sm text-slate-600">{r.convertedAt ? new Date(r.convertedAt).toLocaleDateString() : "—"}</td>
+                                            <td className="px-5 py-4 text-sm text-slate-600">{r.convertedAt || r.referredUserId?.subscriptionStatus === 'active' ? new Date(r.convertedAt || r.createdAt).toLocaleDateString() : "—"}</td>
                                             <td className="px-5 py-4">
-                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${r.convertedAt ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                                                    {r.convertedAt ? "Converted" : "Pending"}
+                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${(r.convertedAt || r.referredUserId?.subscriptionStatus === 'active') ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                                                    {(r.convertedAt || r.referredUserId?.subscriptionStatus === 'active') ? "Converted" : "Pending"}
                                                 </span>
                                             </td>
                                         </tr>

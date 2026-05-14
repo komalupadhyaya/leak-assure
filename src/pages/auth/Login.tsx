@@ -14,9 +14,6 @@ const Login = () => {
         setLoading(true);
         try {
             const data = await login(formData);
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
-
             toast.success("Welcome back!");
 
             if (data.user.forcePasswordChange) {

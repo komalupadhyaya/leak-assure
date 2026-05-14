@@ -139,7 +139,14 @@ export function AddressAutocomplete({
 
         if (geocoderRef.current) {
             try {
-                const result = await geocoderRef.current.geocode({ placeId: suggestion.place_id });
+                // Ensure we handle the promise rejection if API is disabled
+                const result = await new Promise<any>((resolve, reject) => {
+                    geocoderRef.current.geocode({ placeId: suggestion.place_id }, (results: any, status: string) => {
+                        if (status === "OK") resolve({ results });
+                        else reject(new Error(status));
+                    });
+                });
+
                 if (result.results?.[0]) {
                     const res = result.results[0];
                     const loc = res.geometry.location;
@@ -155,8 +162,12 @@ export function AddressAutocomplete({
                     onSelect(suggestion.description, components);
                     return;
                 }
-            } catch { /* fall through */ }
+            } catch (err) {
+                console.warn("Geocoding failed, falling back to description only:", err);
+            }
         }
+        
+        // Fallback: always call onSelect so the input stays filled
         onSelect(suggestion.description);
     };
 

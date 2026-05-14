@@ -11,6 +11,8 @@ const Commission = require('../models/Commission');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const Affiliate = require('../models/Affiliate');
+const Payment = require('../models/Payment');
 
 exports.handleWebhook = async (req, res) => {
 
@@ -92,6 +94,22 @@ exports.handleWebhook = async (req, res) => {
 
                 await user.save();
                 console.log("[Webhook] User record updated successfully. Current status:", user.subscriptionStatus);
+
+                // RECORD INITIAL PAYMENT
+                try {
+                    await Payment.create({
+                        memberId: user._id,
+                        stripePaymentIntentId: session.payment_intent,
+                        stripeInvoiceId: session.invoice,
+                        amount: session.amount_total / 100,
+                        status: 'succeeded',
+                        planType: user.plan,
+                        billingReason: 'subscription_create'
+                    });
+                    console.log("[Webhook] Initial payment recorded in DB.");
+                } catch (payErr) {
+                    console.error("[Webhook Payment Recording Error]:", payErr.message);
+                }
             } else {
                 console.log("[Webhook] User already active. Processing remaining triggers (email, referrals)...");
             }
@@ -104,7 +122,21 @@ exports.handleWebhook = async (req, res) => {
                     referral.convertedAt = new Date();
                     await referral.save();
 
-                    const commissionAmount = parseInt(process.env.AFFILIATE_COMMISSION_AMOUNT || '20', 10);
+                    const affiliate = await Affiliate.findById(referral.affiliateId);
+                    let commissionAmount = 0;
+
+                    if (affiliate) {
+                        const paidAmount = session.amount_total / 100;
+                        if (affiliate.commissionType === 'fixed') {
+                            commissionAmount = affiliate.commissionValue;
+                        } else {
+                            commissionAmount = (paidAmount * affiliate.commissionValue) / 100;
+                        }
+                    } else {
+                        // Fallback to env if affiliate not found for some reason
+                        commissionAmount = parseInt(process.env.AFFILIATE_COMMISSION_AMOUNT || '20', 10);
+                    }
+
                     const commission = new Commission({
                         affiliateId: referral.affiliateId,
                         referralId: referral._id,
@@ -112,7 +144,7 @@ exports.handleWebhook = async (req, res) => {
                         status: 'pending',
                     });
                     await commission.save();
-                    console.log(`[Webhook] Referral record updated and commission created.`);
+                    console.log(`[Webhook] Referral record updated and commission created: $${commissionAmount}`);
                 }
             } catch (refErr) {
                 console.error('[Webhook Referral Error]:', refErr.message);
@@ -179,6 +211,16 @@ exports.handleWebhook = async (req, res) => {
 
                 console.log("User marked past_due with grace period:", user.email);
                 
+                // RECORD FAILED PAYMENT
+                await Payment.create({
+                    memberId: user._id,
+                    stripeInvoiceId: invoice.id,
+                    amount: invoice.amount_due / 100,
+                    status: 'failed',
+                    planType: user.plan,
+                    billingReason: invoice.billing_reason
+                });
+
                 // NOTIFY USER ABOUT FAILED PAYMENT
                 await emailService.sendPaymentFailedNotice(user.email, user.fullName);
             } else {
@@ -187,6 +229,67 @@ exports.handleWebhook = async (req, res) => {
         } catch (error) {
             console.error("Error handling invoice.payment_failed");
             console.error(error);
+        }
+
+    } else if (event.type === 'invoice.payment_succeeded') {
+        const invoice = event.data.object;
+        
+        // Skip initial payment if it was already handled by checkout.session.completed
+        // (Checkout session usually handles the first payment of a subscription)
+        if (invoice.billing_reason === 'subscription_create') {
+            console.log("[Webhook] Skipping recurring commission for initial subscription invoice.");
+            return res.json({ received: true });
+        }
+
+        console.log("\n--- RECURRING PAYMENT SUCCEEDED ---");
+        console.log("Invoice ID:", invoice.id);
+        console.log("Customer ID:", invoice.customer);
+
+        try {
+            const user = await User.findOne({ stripeCustomerId: invoice.customer });
+            if (!user) {
+                console.warn("[Webhook] User not found for recurring payment:", invoice.customer);
+                return res.json({ received: true });
+            }
+
+            const referral = await Referral.findOne({ referredUserId: user._id });
+            if (referral) {
+                const affiliate = await Affiliate.findById(referral.affiliateId);
+                let commissionAmount = 0;
+
+                if (affiliate) {
+                    const paidAmount = invoice.amount_paid / 100;
+                    if (affiliate.commissionType === 'fixed') {
+                        commissionAmount = affiliate.commissionValue;
+                    } else {
+                        commissionAmount = (paidAmount * affiliate.commissionValue) / 100;
+                    }
+
+                    const commission = new Commission({
+                        affiliateId: affiliate._id,
+                        referralId: referral._id,
+                        amount: commissionAmount,
+                        status: 'pending',
+                        metadata: { invoiceId: invoice.id }
+                    });
+                    await commission.save();
+                    console.log(`[Webhook] Recurring commission created: $${commissionAmount} for affiliate: ${affiliate.email}`);
+                }
+            }
+
+            // RECORD SUCCESSFUL RECURRING PAYMENT
+            await Payment.create({
+                memberId: user._id,
+                stripeInvoiceId: invoice.id,
+                stripePaymentIntentId: invoice.payment_intent,
+                amount: invoice.amount_paid / 100,
+                status: 'succeeded',
+                planType: user.plan,
+                billingReason: invoice.billing_reason
+            });
+            console.log("[Webhook] Recurring payment recorded in DB.");
+        } catch (error) {
+            console.error("[Webhook] Error processing recurring commission:", error.message);
         }
 
     } else if (event.type === 'customer.subscription.deleted') {
@@ -252,6 +355,31 @@ exports.getSessionDetails = async (req, res) => {
             domain: process.env.COOKIE_DOMAIN || '.leakassure.com',
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
+
+        // --- FALLBACK TRIGGER: Activate account if webhook missed it ---
+        if (user.subscriptionStatus === 'pending') {
+            console.log(`[Fallback] Activating account for: ${user.email}`);
+            user.subscriptionStatus = 'active';
+            user.activatedAt = new Date();
+            user.stripeSubscriptionId = session.subscription;
+            user.planPrice = session.amount_total ? session.amount_total / 100 : (user.plan === 'premium' ? 49 : 29);
+            await user.save();
+        }
+
+        // --- FALLBACK TRIGGER: Send enrollment email if webhook missed it ---
+        if (!user.confirmationEmailSent) {
+            console.log(`[Fallback] Triggering enrollment confirmation for: ${user.email}`);
+            try {
+                const emailResult = await emailService.sendEnrollmentConfirmationEmail(user);
+                if (emailResult) {
+                    user.confirmationEmailSent = true;
+                    await user.save();
+                    console.log("[Fallback] Confirmation email sent successfully.");
+                }
+            } catch (notifyError) {
+                console.error("[Fallback Notification Error]:", notifyError.message);
+            }
+        }
 
         res.json({
             name: user.fullName,

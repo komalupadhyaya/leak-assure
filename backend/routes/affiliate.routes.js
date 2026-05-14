@@ -7,6 +7,8 @@ const portalController = require('../controllers/affiliatePortal.controller');
 // Public
 router.post('/signup', authController.affiliateSignup);
 router.post('/login', authController.affiliateLogin);
+router.post('/logout', authController.affiliateLogout);
+router.get('/slug/:slug', authController.getAffiliateBySlug);
 
 // Protected (affiliate auth)
 router.get('/me', affiliateAuth, portalController.getMe);

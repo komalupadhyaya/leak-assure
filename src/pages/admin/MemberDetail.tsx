@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import AdminLayout from "./AdminLayout";
-import { getMemberById, cancelSubscription, getClaimsByMember, addMemberNote, resetMemberPassword } from "@/services/api";
+import { getMemberById, cancelSubscription, getClaimsByMember, addMemberNote, resetMemberPassword, syncMemberPayments } from "@/services/api";
 import {
     User,
     Mail,
@@ -33,6 +33,7 @@ const MemberDetail = () => {
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const [resetPasswordValue, setResetPasswordValue] = useState("");
     const [isResettingPassword, setIsResettingPassword] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const fetchMemberData = async () => {
         try {
@@ -104,6 +105,21 @@ const MemberDetail = () => {
             toast.error("Failed to reset password.");
         } finally {
             setIsResettingPassword(false);
+        }
+    };
+
+    const handleSyncPayments = async () => {
+        setIsSyncing(true);
+        try {
+            if (id) {
+                const result = await syncMemberPayments(id);
+                toast.success(result.message);
+                fetchMemberData(); // Refresh the UI
+            }
+        } catch (error: any) {
+            toast.error(error.message || "Failed to sync payments");
+        } finally {
+            setIsSyncing(false);
         }
     };
 
@@ -188,6 +204,38 @@ const MemberDetail = () => {
                                     </p>
                                     <p className="text-slate-900 font-mono text-xs">{member.stripeSubscriptionId || "—"}</p>
                                 </div>
+                                <div className="sm:col-span-2 p-4 bg-slate-50 rounded-lg border border-slate-100 mt-4">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                                        <Shield className="h-3 w-3 text-blue-500" /> Referral Source
+                                    </p>
+                                    {member.referral ? (
+                                        member.referral.affiliateId ? (
+                                            <div className="flex items-center gap-4">
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Affiliate Name</p>
+                                                    <p className="text-sm font-bold text-slate-900">{member.referral.affiliateId.name}</p>
+                                                </div>
+                                                <div className="h-8 w-px bg-slate-200" />
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Referral Code</p>
+                                                    <p className="text-sm font-bold text-blue-600 font-mono">{member.referral.affiliateId.referralCode}</p>
+                                                </div>
+                                                <div className="h-8 w-px bg-slate-200" />
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Affiliate Email</p>
+                                                    <p className="text-sm font-medium text-slate-700">{member.referral.affiliateId.email}</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 p-2 bg-amber-50 rounded-lg border border-amber-100">
+                                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                                <p className="text-xs text-amber-700 font-medium">Affiliate account is no longer active / deleted</p>
+                                            </div>
+                                        )
+                                    ) : (
+                                        <p className="text-xs text-slate-500 italic">No referral source (Direct Signup)</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -250,14 +298,65 @@ const MemberDetail = () => {
                                 )}
 
                                 {activeTab === 'payments' && (
-                                    <div className="space-y-4">
-                                        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                                            <History className="h-10 w-10 mb-2 opacity-20" />
-                                            <p className="text-sm italic">Payment history integrated with Stripe. Use Stripe dashboard for full ledger.</p>
-                                            <p className="text-[10px] mt-2 uppercase font-bold tracking-widest">Last Payment: {member.lastPaymentDate ? new Date(member.lastPaymentDate).toLocaleDateString() : "Never"}</p>
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                            <div>
+                                                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Stripe Synchronization</h4>
+                                                <p className="text-[10px] text-slate-500 mt-1">If history is missing, pull latest invoices directly from Stripe.</p>
+                                            </div>
+                                            <button
+                                                onClick={handleSyncPayments}
+                                                disabled={isSyncing}
+                                                className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors border border-slate-200 shadow-sm disabled:opacity-50"
+                                            >
+                                                <History className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                                                {isSyncing ? "Syncing..." : "Sync with Stripe"}
+                                            </button>
                                         </div>
+
+                                        <div className="space-y-4">
+                                        {member.payments && member.payments.length > 0 ? (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left text-sm">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                            <th className="py-3 px-2">Date</th>
+                                                            <th className="py-3 px-2">Amount</th>
+                                                            <th className="py-3 px-2">Status</th>
+                                                            <th className="py-3 px-2">ID</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-50">
+                                                        {member.payments.map((p: any) => (
+                                                            <tr key={p._id} className="text-slate-600">
+                                                                <td className="py-3 px-2 whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
+                                                                <td className="py-3 px-2 font-bold text-slate-900">${p.amount.toFixed(2)}</td>
+                                                                <td className="py-3 px-2">
+                                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                                                        p.status === 'succeeded' ? 'bg-green-100 text-green-700' : 
+                                                                        p.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                                                                    }`}>
+                                                                        {p.status}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="py-3 px-2 font-mono text-[10px] text-slate-400">
+                                                                    {p.stripeInvoiceId || p.stripePaymentIntentId || "—"}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                                                <History className="h-10 w-10 mb-2 opacity-20" />
+                                                <p className="text-sm italic">No payment history found in local records.</p>
+                                                <p className="text-[10px] mt-2 uppercase font-bold tracking-widest">Initial Sync may be required from Stripe Dashboard.</p>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                </div>
+                            )}
 
                                 {activeTab === 'notes' && (
                                     <div className="space-y-6">

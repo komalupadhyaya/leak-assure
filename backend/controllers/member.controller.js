@@ -1,6 +1,8 @@
 const Stripe = require('stripe');
 const User = require('../models/User');
 const Claim = require('../models/Claim');
+const Referral = require('../models/Referral');
+const Affiliate = require('../models/Affiliate');
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
@@ -151,6 +153,56 @@ exports.memberCancelSubscription = async (req, res) => {
     }
 };
 
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const emailService = require('../services/email.service');
+
+exports.createMember = async (req, res) => {
+    try {
+        const { firstName, lastName, email, phone, serviceAddress, plan } = req.body;
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ error: 'User with this email already exists' });
+        }
+
+        // Generate temporary password
+        const tempPassword = crypto.randomBytes(4).toString('hex');
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+        const member = new User({
+            firstName,
+            lastName,
+            fullName: `${firstName} ${lastName}`,
+            email,
+            phone,
+            serviceAddress,
+            plan,
+            password: hashedPassword,
+            role: 'member',
+            forcePasswordChange: true,
+            subscriptionStatus: 'active', // Admin created members are active by default
+            activatedAt: new Date(),
+            waitingPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        });
+
+        await member.save();
+
+        // Send Welcome & Credentials Email
+        await emailService.sendLoginCredentials(email, member.fullName, tempPassword);
+        await emailService.sendEnrollmentConfirmationEmail(member);
+        
+        member.confirmationEmailSent = true;
+        await member.save();
+
+        res.status(201).json(member);
+    } catch (error) {
+        console.error('Error creating member:', error);
+        res.status(500).json({ error: 'Failed to create member' });
+    }
+};
+
 const AuditLog = require('../models/AuditLog');
 
 exports.getAllMembers = async (req, res) => {
@@ -179,14 +231,70 @@ exports.getAllMembers = async (req, res) => {
     }
 };
 
+const Payment = require('../models/Payment');
+
 exports.getMemberById = async (req, res) => {
     try {
-        const member = await User.findOne({ _id: req.params.id, role: 'member' });
+        const member = await User.findOne({ _id: req.params.id, role: 'member' }).lean();
         if (!member) return res.status(404).json({ error: 'Member not found' });
+
+        // Fetch payments
+        const payments = await Payment.find({ memberId: member._id }).sort({ createdAt: -1 });
+        member.payments = payments;
+
+        // Fetch referral info if any
+        const referral = await Referral.findOne({ referredUserId: member._id })
+            .populate('affiliateId', 'name email referralCode')
+            .lean();
+
+        if (referral) {
+            member.referral = referral;
+        }
+
         res.json(member);
     } catch (error) {
         console.error('Error fetching member:', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.syncMemberPayments = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || !user.stripeCustomerId) {
+            return res.status(404).json({ error: 'Stripe customer ID not found for this member' });
+        }
+
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        const invoices = await stripe.invoices.list({
+            customer: user.stripeCustomerId,
+            limit: 50,
+        });
+
+        const syncResults = [];
+        for (const invoice of invoices.data) {
+            // Upsert payment record
+            const payment = await Payment.findOneAndUpdate(
+                { stripeInvoiceId: invoice.id },
+                {
+                    memberId: user._id,
+                    stripeInvoiceId: invoice.id,
+                    stripePaymentIntentId: invoice.payment_intent,
+                    amount: invoice.amount_paid / 100,
+                    status: invoice.status === 'paid' ? 'succeeded' : (invoice.status === 'open' ? 'pending' : 'failed'),
+                    planType: user.plan,
+                    billingReason: invoice.billing_reason,
+                    createdAt: new Date(invoice.created * 1000)
+                },
+                { upsert: true, new: true }
+            );
+            syncResults.push(payment);
+        }
+
+        res.json({ message: `Synced ${syncResults.length} invoices from Stripe`, count: syncResults.length });
+    } catch (error) {
+        console.error('Error syncing payments:', error);
+        res.status(500).json({ error: error.message || 'Failed to sync payments' });
     }
 };
 

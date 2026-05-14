@@ -64,12 +64,14 @@ exports.login = async (req, res) => {
             });
         }
 
-        // Prevent login if subscription is not active
-        if (user.subscriptionStatus !== 'active') {
-            const message = user.subscriptionStatus === 'canceled'
-                ? 'Your subscription is canceled.'
-                : 'Please complete your payment to activate your account.';
-            return res.status(403).json({ error: message });
+        // Prevent login if subscription is canceled
+        if (user.subscriptionStatus === 'canceled') {
+            return res.status(403).json({ error: 'Your subscription is canceled.' });
+        }
+
+        // Allow 'active' and 'pending' statuses to login
+        if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'pending') {
+            return res.status(403).json({ error: 'Please complete your payment to activate your account.' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -79,17 +81,14 @@ exports.login = async (req, res) => {
 
         const token = jwt.sign({ id: user._id, email: user.email, role: user.role || 'member' }, JWT_SECRET, { expiresIn: '7d' });
 
-        // Set cookie for cross-subdomain auto-login
         res.cookie('token', token, {
-            httpOnly: false, // Set to false so frontend can read it for cross-subdomain auto-login
-            secure: true,
-            sameSite: 'none',
-            domain: process.env.COOKIE_DOMAIN || '.leakassure.com',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
         res.json({
-            token,
             user: {
                 id: user._id,
                 email: user.email,
@@ -102,6 +101,15 @@ exports.login = async (req, res) => {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
+};
+
+exports.logout = async (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+    res.json({ message: 'Logged out successfully' });
 };
 
 exports.updatePassword = async (req, res) => {

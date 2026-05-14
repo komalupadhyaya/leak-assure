@@ -7,7 +7,7 @@ import {
     ShieldCheck
 } from "lucide-react";
 import { ResponsiveSidebar } from "@/components/ResponsiveSidebar";
-import { getMyProfile } from "@/services/api";
+import { getMyProfile, logout } from "@/services/api";
 
 interface MemberLayoutProps {
     children: ReactNode;
@@ -37,9 +37,8 @@ const MemberLayout = ({ children }: MemberLayoutProps) => {
 
     const currentTitle = menuItems.find(i => i.path === location.pathname)?.title || "Member Portal";
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    const handleLogout = async () => {
+        await logout();
         window.location.href = '/login';
     };
 

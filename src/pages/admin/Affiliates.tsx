@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "./AdminLayout";
-import { adminGetAllAffiliates, adminUpdateAffiliateStatus, adminGetAllPayouts, adminMarkPayoutPaid, adminGetAllCreatives, adminCreateCreative, adminDeleteCreative, adminGetAffiliateDetail, adminCreatePayout, adminUpdateCommissionStatus, adminBulkUpdateCommissions } from "@/services/affiliateApi";
-import { CheckCircle, XCircle, Eye, DollarSign, Trash2, Plus, Loader2 } from "lucide-react";
+import { adminGetAllAffiliates, adminUpdateAffiliateStatus, adminGetAllPayouts, adminMarkPayoutPaid, adminGetAllCreatives, adminCreateCreative, adminDeleteCreative, adminGetAffiliateDetail, adminCreatePayout, adminUpdateCommissionStatus, adminBulkUpdateCommissions, adminUpdateAffiliateCommission } from "@/services/affiliateApi";
+import { CheckCircle, XCircle, Eye, DollarSign, Trash2, Plus, Loader2, Settings } from "lucide-react";
 import { toast } from "sonner";
 
 const statusBadge = (s: string) =>
@@ -30,6 +30,8 @@ export default function AdminAffiliates() {
     const [selectedMethod, setSelectedMethod] = useState<"paypal" | "zelle" | "">("");
     const [singleCommissionId, setSingleCommissionId] = useState<string | null>(null);
     const [payoutToMark, setPayoutToMark] = useState<any>(null);
+    const [showCommissionModal, setShowCommissionModal] = useState(false);
+    const [commissionForm, setCommissionForm] = useState({ id: "", type: "percentage", value: 20 });
 
     const load = async () => {
         setLoading(true);
@@ -167,6 +169,21 @@ export default function AdminAffiliates() {
         } catch (e: any) { toast.error(e.message); }
     };
 
+    const updateCommissionSettings = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmitting(true);
+        try {
+            await adminUpdateAffiliateCommission(commissionForm.id, {
+                commissionType: commissionForm.type,
+                commissionValue: Number(commissionForm.value)
+            });
+            toast.success("Commission updated");
+            setShowCommissionModal(false);
+            load();
+        } catch (e: any) { toast.error(e.message); }
+        finally { setSubmitting(false); }
+    };
+
     const tabs: { key: Tab; label: string }[] = [
         { key: "affiliates", label: "All Affiliates" },
         { key: "payouts", label: "Payouts" },
@@ -194,6 +211,17 @@ export default function AdminAffiliates() {
                                         <button onClick={() => updateStatus(detail.affiliate._id, "rejected")}
                                             className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700">Reject</button>
                                     )}
+                                    <button onClick={() => {
+                                        setCommissionForm({
+                                            id: detail.affiliate._id,
+                                            type: detail.affiliate.commissionType || "percentage",
+                                            value: String(detail.affiliate.commissionValue || 0) as any
+                                        });
+                                        setShowCommissionModal(true);
+                                    }}
+                                        className="px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 flex items-center gap-1">
+                                        <Settings className="h-3.5 w-3.5" /> Commission
+                                    </button>
                                     <button onClick={() => { setDetail(null); setShowPayoutForm(false); setSelectedCommissions([]); }}
                                         className="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200">Close</button>
                                 </div>
@@ -300,7 +328,7 @@ export default function AdminAffiliates() {
                             <table className="min-w-full">
                                 <thead className="bg-slate-50 border-b border-slate-100">
                                     <tr>
-                                        {["Name", "Email", "Referrals", "Earnings", "Status", "Actions"].map(h => (
+                                        {["Name", "Email", "Rate", "Referrals", "Earnings", "Status", "Actions"].map(h => (
                                             <th key={h} className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
                                         ))}
                                     </tr>
@@ -310,6 +338,9 @@ export default function AdminAffiliates() {
                                         <tr key={a._id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-5 py-4 text-sm font-semibold text-slate-900">{a.name}</td>
                                             <td className="px-5 py-4 text-sm text-slate-500">{a.email}</td>
+                                            <td className="px-5 py-4 text-sm font-medium text-blue-600">
+                                                {a.commissionType === 'fixed' ? `$${a.commissionValue}` : `${a.commissionValue}%`}
+                                            </td>
                                             <td className="px-5 py-4 text-sm text-slate-700">{a.referralCount ?? 0}</td>
                                             <td className="px-5 py-4 text-sm font-bold text-slate-900">${a.totalEarnings ?? 0}</td>
                                             <td className="px-5 py-4">
@@ -470,6 +501,65 @@ export default function AdminAffiliates() {
                                     Confirm & Mark Paid
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                )}
+                {/* Commission Modal */}
+                {showCommissionModal && (
+                    <div className="fixed inset-0 bg-slate-900/40 z-[101] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+                            <form onSubmit={updateCommissionSettings}>
+                                <div className="p-5 border-b border-slate-100">
+                                    <h3 className="font-bold text-slate-900">Affiliate Commission</h3>
+                                </div>
+                                <div className="p-5 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Commission Type</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button type="button" onClick={() => setCommissionForm({ ...commissionForm, type: 'percentage' })}
+                                                className={`px-4 py-2 text-sm font-bold rounded-xl border transition-all ${commissionForm.type === 'percentage' ? 'bg-blue-50 border-blue-600 text-blue-600' : 'bg-white border-slate-200 text-slate-600'}`}>
+                                                Percentage (%)
+                                            </button>
+                                            <button type="button" onClick={() => setCommissionForm({ ...commissionForm, type: 'fixed' })}
+                                                className={`px-4 py-2 text-sm font-bold rounded-xl border transition-all ${commissionForm.type === 'fixed' ? 'bg-blue-50 border-blue-600 text-blue-600' : 'bg-white border-slate-200 text-slate-600'}`}>
+                                                Fixed ($)
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                            {commissionForm.type === 'percentage' ? 'Percentage Amount (%)' : 'Fixed Amount ($)'}
+                                        </label>
+                                        <input type="number" step="0.01" required 
+                                            value={commissionForm.value}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={e => {
+                                                let val = e.target.value;
+                                                // If it was "0" and user typed a digit, remove the leading "0"
+                                                if (String(commissionForm.value) === "0" && val.length > 1 && val.startsWith("0")) {
+                                                    val = val.substring(1);
+                                                }
+                                                setCommissionForm({ ...commissionForm, value: val as any });
+                                            }}
+                                            className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                                        <p className="mt-2 text-xs text-slate-400">
+                                            {commissionForm.type === 'percentage' 
+                                                ? 'Affiliate earns this % of every successful payment.' 
+                                                : 'Affiliate earns this flat amount for every successful payment.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                                    <button type="button" onClick={() => setShowCommissionModal(false)}
+                                        className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" disabled={submitting}
+                                        className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors">
+                                        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 )}

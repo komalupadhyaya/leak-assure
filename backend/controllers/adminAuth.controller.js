@@ -33,8 +33,14 @@ exports.login = async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        res.cookie('admin_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
         res.json({
-            token,
             user: {
                 id: user._id,
                 email: user.email,
@@ -44,6 +50,30 @@ exports.login = async (req, res) => {
         });
     } catch (error) {
         console.error('Admin login error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+exports.logout = async (req, res) => {
+    res.clearCookie('admin_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+    res.json({ message: 'Logged out successfully' });
+};
+
+exports.getMe = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json({
+            id: user._id,
+            email: user.email,
+            fullName: user.fullName,
+            role: user.role
+        });
+    } catch (error) {
         res.status(500).json({ error: 'Internal server error' });
     }
 };

@@ -21,6 +21,7 @@ export async function startSignup(payload: SignupPayload): Promise<SignupRespons
     const res = await fetch(`${API_BASE}/api/signup/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload),
     });
 
@@ -39,7 +40,6 @@ export interface SessionDetails {
     price: number;
     serviceAddress: string;
     waitingPeriodEnd: string;
-    token?: string;
     user?: {
         id: string;
         email: string;
@@ -50,7 +50,9 @@ export interface SessionDetails {
 }
 
 export async function getSessionDetails(sessionId: string): Promise<SessionDetails> {
-    const res = await fetch(`${API_BASE}/api/stripe/session/${sessionId}`);
+    const res = await fetch(`${API_BASE}/api/stripe/session/${sessionId}`, {
+        credentials: 'include',
+    });
 
     if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -62,40 +64,48 @@ export async function getSessionDetails(sessionId: string): Promise<SessionDetai
 
 // Admin & Members
 export async function getDashboardStats() {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/admin/ph3/dashboard`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch dashboard stats');
     return res.json();
 }
 
 export async function getMembers() {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/members`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch members');
     return res.json();
 }
 
+export async function adminCreateMember(data: any) {
+    const res = await fetch(`${API_BASE}/api/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to create member');
+    }
+    return res.json();
+}
+
 export async function getMemberById(id: string) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/members/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch member');
     return res.json();
 }
 
 export async function updateMember(id: string, data: any) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/members/${id}`, {
         method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Failed to update member');
@@ -103,57 +113,59 @@ export async function updateMember(id: string, data: any) {
 }
 
 export async function cancelSubscription(id: string) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/members/${id}/cancel`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to cancel subscription');
     return res.json();
 }
 
 export async function addMemberNote(id: string, data: { note: string }) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/members/${id}/note`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Failed to add member note');
     return res.json();
 }
 
+export async function syncMemberPayments(id: string) {
+    const res = await fetch(`${API_BASE}/api/members/${id}/sync-payments`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to sync payments');
+    }
+    return res.json();
+}
 
 // Claims
 export async function getClaims() {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/claims`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch claims');
     return res.json();
 }
 
 export async function getClaimById(id: string) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/claims/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch claim');
     return res.json();
 }
 
 export async function updateClaimStatus(id: string, status: string) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/claims/${id}/status`, {
         method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status }),
     });
     if (!res.ok) throw new Error('Failed to update claim status');
@@ -161,13 +173,10 @@ export async function updateClaimStatus(id: string, status: string) {
 }
 
 export async function assignVendor(id: string, vendorId: string | null) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/claims/${id}/vendor`, {
         method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ vendorId }),
     });
     if (!res.ok) throw new Error('Failed to assign vendor');
@@ -175,13 +184,10 @@ export async function assignVendor(id: string, vendorId: string | null) {
 }
 
 export async function addClaimNote(id: string, note: string) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/claims/${id}/notes`, {
         method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ note }),
     });
     if (!res.ok) throw new Error('Failed to add note');
@@ -193,6 +199,7 @@ export async function login(credentials: any) {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(credentials),
     });
     if (!res.ok) {
@@ -202,10 +209,18 @@ export async function login(credentials: any) {
     return res.json();
 }
 
+export async function logout() {
+    await fetch(`${API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+}
+
 export async function adminLogin(credentials: any) {
     const res = await fetch(`${API_BASE}/api/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(credentials),
     });
     if (!res.ok) {
@@ -215,22 +230,33 @@ export async function adminLogin(credentials: any) {
     return res.json();
 }
 
+export async function adminLogout() {
+    await fetch(`${API_BASE}/api/admin/logout`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+}
+
+export async function adminGetMe() {
+    const res = await fetch(`${API_BASE}/api/admin/me`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch admin profile');
+    return res.json();
+}
+
 export async function getMyProfile() {
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/member/me`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch profile');
     return res.json();
 }
 
 export async function fileMemberClaim(formData: FormData) {
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/member/claim`, {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        },
+        credentials: 'include',
         body: formData,
     });
     if (!res.ok) {
@@ -241,19 +267,17 @@ export async function fileMemberClaim(formData: FormData) {
 }
 
 export async function getMemberClaims() {
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/member/claims`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch claim history');
     return res.json();
 }
 
 export async function memberCancelSelf() {
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/member/cancel`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to cancel subscription');
     return res.json();
@@ -261,32 +285,26 @@ export async function memberCancelSelf() {
 
 // Vendors
 export async function getVendors() {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/vendors`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch vendors');
     return res.json();
 }
 
 export async function getClaimsByMember(memberId: string) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/claims/member/${memberId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch member claims');
     return res.json();
 }
 
-
 export async function createVendor(vendorData: any) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/vendors`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(vendorData),
     });
     if (!res.ok) throw new Error('Failed to create vendor');
@@ -294,13 +312,10 @@ export async function createVendor(vendorData: any) {
 }
 
 export async function updateVendor(id: string, vendorData: any) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/vendors/${id}`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(vendorData),
     });
     if (!res.ok) throw new Error('Failed to update vendor');
@@ -308,23 +323,19 @@ export async function updateVendor(id: string, vendorData: any) {
 }
 
 export async function deleteVendor(id: string) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/vendors/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to delete vendor');
     return res.json();
 }
 
 export const changePassword = async (newPassword: string): Promise<{ message: string }> => {
-    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE}/api/auth/update-password`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ newPassword }),
     });
 
@@ -337,10 +348,10 @@ export const changePassword = async (newPassword: string): Promise<{ message: st
 };
 
 export async function createAdminUser(data: { fullName: string; email: string; password: string }) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/admin/ph3/admin-users`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed to create admin user'); }
@@ -348,10 +359,10 @@ export async function createAdminUser(data: { fullName: string; email: string; p
 }
 
 export async function resetMemberPassword(memberId: string, newPassword: string) {
-    const token = localStorage.getItem('admin_token');
     const res = await fetch(`${API_BASE}/api/admin/ph3/members/${memberId}/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ newPassword }),
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed to reset password'); }
