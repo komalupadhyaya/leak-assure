@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.leakassure.com';
+const ENV = import.meta.env.VITE_APP_ENV || 'production';
+const API_URL = ENV === 'development' ? 'http://localhost:5000' : 'https://api.leakassure.com';
 
 const credHeaders = () => ({
     'Content-Type': 'application/json',
@@ -31,7 +32,10 @@ export const affiliateLogin = async (email: string, password: string) => {
     return json;
 };
 
+let affiliateGetMePromise: Promise<any> | null = null;
+
 export const affiliateLogout = async () => {
+    affiliateGetMePromise = null;
     await fetch(`${API_URL}/api/affiliate/logout`, {
         method: 'POST',
         credentials: 'include',
@@ -40,10 +44,19 @@ export const affiliateLogout = async () => {
 
 // --- PORTAL ---
 export const affiliateGetMe = async () => {
-    const res = await fetch(`${API_URL}/api/affiliate/me`, { credentials: 'include' });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Failed to load profile');
-    return json;
+    if (affiliateGetMePromise) return affiliateGetMePromise;
+    affiliateGetMePromise = (async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/affiliate/me`, { credentials: 'include' });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to load profile');
+            return json;
+        } catch (error) {
+            affiliateGetMePromise = null;
+            throw error;
+        }
+    })();
+    return affiliateGetMePromise;
 };
 
 export const affiliateGetReferrals = async () => {
@@ -68,6 +81,7 @@ export const affiliateGetCreatives = async () => {
 };
 
 export const affiliateUpdateSettings = async (data: { paypalEmail: string; zelleInfo: string }) => {
+    affiliateGetMePromise = null;
     const res = await fetch(`${API_URL}/api/affiliate/settings`, {
         method: 'PATCH',
         headers: credHeaders(),

@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.leakassure.com';
+const ENV = import.meta.env.VITE_APP_ENV || 'production';
+const API_BASE = ENV === 'development' ? 'http://localhost:5000' : 'https://api.leakassure.com';
 
 export interface SignupPayload {
     firstName: string;
@@ -103,6 +104,8 @@ export async function getMemberById(id: string) {
 }
 
 export async function updateMember(id: string, data: any) {
+    getMyProfilePromise = null;
+    adminGetMePromise = null;
     const res = await fetch(`${API_BASE}/api/members/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -231,7 +234,11 @@ export async function adminLogin(credentials: any) {
     return res.json();
 }
 
+let adminGetMePromise: Promise<any> | null = null;
+let getMyProfilePromise: Promise<any> | null = null;
+
 export async function adminLogout() {
+    adminGetMePromise = null;
     await fetch(`${API_BASE}/api/admin/logout`, {
         method: 'POST',
         credentials: 'include',
@@ -239,19 +246,37 @@ export async function adminLogout() {
 }
 
 export async function adminGetMe() {
-    const res = await fetch(`${API_BASE}/api/admin/me`, {
-        credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to fetch admin profile');
-    return res.json();
+    if (adminGetMePromise) return adminGetMePromise;
+    adminGetMePromise = (async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/admin/me`, {
+                credentials: 'include',
+            });
+            if (!res.ok) throw new Error('Failed to fetch admin profile');
+            return await res.json();
+        } catch (error) {
+            adminGetMePromise = null;
+            throw error;
+        }
+    })();
+    return adminGetMePromise;
 }
 
 export async function getMyProfile() {
-    const res = await fetch(`${API_BASE}/api/member/me`, {
-        credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to fetch profile');
-    return res.json();
+    if (getMyProfilePromise) return getMyProfilePromise;
+    getMyProfilePromise = (async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/member/me`, {
+                credentials: 'include',
+            });
+            if (!res.ok) throw new Error('Failed to fetch profile');
+            return await res.json();
+        } catch (error) {
+            getMyProfilePromise = null;
+            throw error;
+        }
+    })();
+    return getMyProfilePromise;
 }
 
 export async function fileMemberClaim(formData: FormData) {

@@ -81,7 +81,13 @@ exports.getCommissions = async (req, res) => {
     try {
         const commissions = await Commission.find({ affiliateId: req.affiliate.id })
             .sort({ createdAt: -1 })
-            .populate('referralId');
+            .populate({
+                path: 'referralId',
+                populate: {
+                    path: 'referredUserId',
+                    select: 'fullName email'
+                }
+            });
 
         return res.json(commissions);
     } catch (err) {

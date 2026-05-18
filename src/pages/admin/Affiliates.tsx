@@ -21,11 +21,13 @@ export default function AdminAffiliates() {
     const [creatives, setCreatives] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [detail, setDetail] = useState<any>(null);
+    const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
     const [showPayoutForm, setShowPayoutForm] = useState(false);
     const [payoutForm, setPayoutForm] = useState({ amount: "", method: "paypal", notes: "" });
     const [newCreative, setNewCreative] = useState({ title: "", fileUrl: "", fileType: "banner" });
     const [selectedCommissions, setSelectedCommissions] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
+    const [loadingCommissionId, setLoadingCommissionId] = useState<string | null>(null);
     const [showMethodModal, setShowMethodModal] = useState(false);
     const [selectedMethod, setSelectedMethod] = useState<"paypal" | "zelle" | "">("");
     const [singleCommissionId, setSingleCommissionId] = useState<string | null>(null);
@@ -57,6 +59,7 @@ export default function AdminAffiliates() {
 
     const updateCommission = async (id: string, status: string) => {
         setSubmitting(true);
+        setLoadingCommissionId(id);
         try {
             await adminUpdateCommissionStatus(id, status);
             toast.success(`Commission ${status}`);
@@ -65,7 +68,10 @@ export default function AdminAffiliates() {
                 setDetail({ ...detail, commissions: updatedCommissions });
             }
         } catch (e: any) { toast.error(e.message); }
-        finally { setSubmitting(false); }
+        finally {
+            setSubmitting(false);
+            setLoadingCommissionId(null);
+        }
     };
 
     const openBulkPayModal = (singleId?: string | React.MouseEvent) => {
@@ -151,10 +157,12 @@ export default function AdminAffiliates() {
     };
 
     const openDetail = async (id: string) => {
+        setLoadingDetailId(id);
         try {
             const d = await adminGetAffiliateDetail(id);
             setDetail(d);
         } catch (e: any) { toast.error(e.message); }
+        finally { setLoadingDetailId(null); }
     };
 
     const submitPayout = async (e: React.FormEvent) => {
@@ -269,11 +277,19 @@ export default function AdminAffiliates() {
                                                             className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                                                     )}
                                                     <span className="font-bold text-slate-900 w-16">${c.amount}</span>
-                                                    <span className="flex-1 text-slate-500 text-xs truncate">Referral: {c.referralId?._id?.slice(-6) || "N/A"}</span>
+                                                    <span className="flex-1 text-slate-500 text-xs truncate">Referral: {c.referralId?.referredUserId?.email || c.referralId?.referredEmail || "N/A"}</span>
                                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${statusBadge(c.status)}`}>{c.status}</span>
                                                     {c.status === "pending" && (
-                                                        <button onClick={() => updateCommission(c._id, "approved")}
-                                                            className="text-[10px] font-bold text-blue-600 hover:scale-105 ml-auto">Approve</button>
+                                                        <button 
+                                                            disabled={loadingCommissionId === c._id}
+                                                            onClick={() => updateCommission(c._id, "approved")}
+                                                            className="text-[10px] font-bold text-blue-600 hover:scale-105 ml-auto flex items-center gap-1 disabled:opacity-50">
+                                                            {loadingCommissionId === c._id ? (
+                                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                            ) : (
+                                                                "Approve"
+                                                            )}
+                                                        </button>
                                                     )}
                                                     {c.status === "approved" && (
                                                         <button onClick={() => openBulkPayModal(c._id)}
@@ -285,20 +301,7 @@ export default function AdminAffiliates() {
                                     )}
                                 </div>
 
-                                {/* Referrals */}
-                                <div>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Recent Referrals ({detail.referrals?.length ?? 0})</p>
-                                    {detail.referrals?.length === 0 ? <p className="text-sm text-slate-400">No referrals yet</p> : (
-                                        <div className="space-y-2">
-                                            {detail.referrals?.slice(0, 5).map((r: any) => (
-                                                <div key={r._id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-3 py-2">
-                                                    <span className="text-slate-600">{r.referredUserId?.email || "User registered"}</span>
-                                                    <span className="text-slate-400 text-[10px]">{new Date(r.createdAt).toLocaleDateString()}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -348,7 +351,9 @@ export default function AdminAffiliates() {
                                             </td>
                                             <td className="px-5 py-4">
                                                 <div className="flex items-center gap-1">
-                                                    <button onClick={() => openDetail(a._id)} title="View" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"><Eye className="h-4 w-4" /></button>
+                                                    <button onClick={() => openDetail(a._id)} title="View" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors">
+                                                        {loadingDetailId === a._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                                                    </button>
                                                     {a.status !== "approved" && <button onClick={() => updateStatus(a._id, "approved")} title="Approve" className="p-1.5 rounded-lg hover:bg-green-50 text-slate-400 hover:text-green-600 transition-colors"><CheckCircle className="h-4 w-4" /></button>}
                                                     {a.status !== "rejected" && <button onClick={() => updateStatus(a._id, "rejected")} title="Reject" className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"><XCircle className="h-4 w-4" /></button>}
                                                 </div>
@@ -497,8 +502,15 @@ export default function AdminAffiliates() {
                                 </button>
                                 <button onClick={handleMethodConfirm}
                                     disabled={submitting || !selectedMethod}
-                                    className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors">
-                                    Confirm & Mark Paid
+                                    className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-1.5 justify-center">
+                                    {submitting ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        "Confirm & Mark Paid"
+                                    )}
                                 </button>
                             </div>
                         </div>

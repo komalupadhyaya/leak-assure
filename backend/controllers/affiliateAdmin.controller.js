@@ -89,11 +89,21 @@ exports.getAffiliateDetail = async (req, res) => {
         const affiliate = await Affiliate.findById(req.params.id).select('-password');
         if (!affiliate) return res.status(404).json({ error: 'Affiliate not found' });
 
-        const referrals = await Referral.find({ affiliateId: affiliate._id })
-            .sort({ createdAt: -1 })
-            .populate('referredUserId', 'fullName email');
-        const commissions = await Commission.find({ affiliateId: affiliate._id }).sort({ createdAt: -1 });
-        const payouts = await Payout.find({ affiliateId: affiliate._id }).sort({ createdAt: -1 });
+        const [referrals, commissions, payouts] = await Promise.all([
+            Referral.find({ affiliateId: affiliate._id })
+                .sort({ createdAt: -1 })
+                .populate('referredUserId', 'fullName email'),
+            Commission.find({ affiliateId: affiliate._id })
+                .sort({ createdAt: -1 })
+                .populate({
+                    path: 'referralId',
+                    populate: {
+                        path: 'referredUserId',
+                        select: 'fullName email'
+                    }
+                }),
+            Payout.find({ affiliateId: affiliate._id }).sort({ createdAt: -1 })
+        ]);
 
         return res.json({ affiliate, referrals, commissions, payouts });
     } catch (err) {

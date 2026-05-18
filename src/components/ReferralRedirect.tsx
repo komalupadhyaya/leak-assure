@@ -20,16 +20,24 @@ export default function ReferralRedirect() {
             }
 
             try {
-                const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+                // Clear any potential old cookie set on the specific subdomain to prevent conflicts
+                document.cookie = 'la_ref=; path=/; max-age=0; SameSite=Lax';
+                // Also clear it on the root domain just in case
+                const domain = window.location.hostname.includes("leakassure.com") ? "; domain=.leakassure.com" : "";
+                if (domain) document.cookie = `la_ref=; path=/; max-age=0; SameSite=Lax${domain}`;
+
+                const ENV = import.meta.env.VITE_APP_ENV || 'production';
+                const API_URL = ENV === 'development' ? 'http://localhost:5000' : 'https://api.leakassure.com';
                 const res = await fetch(`${API_URL}/api/affiliate/slug/${slug}`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.referralCode) {
                         // Set the cookie on the root domain so it works across subdomains (admin, signup, member, etc.)
-                        const domain = window.location.hostname.includes("leakassure.com") ? "; domain=.leakassure.com" : "";
                         document.cookie = `la_ref=${data.referralCode}; path=/; max-age=${60 * 60 * 24 * 1}; SameSite=Lax${domain}`;
                         console.log(`[Referral] Applied slug: ${slug}, code: ${data.referralCode}${domain}`);
                     }
+                } else {
+                    console.warn(`[Referral] Slug invalid or not approved: ${slug}`);
                 }
             } catch (err) {
                 console.error("[Referral] Error checking slug:", err);
