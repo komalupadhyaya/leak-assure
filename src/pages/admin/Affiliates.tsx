@@ -281,7 +281,7 @@ export default function AdminAffiliates() {
                                                             }}
                                                             className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                                                     )}
-                                                    <span className="font-bold text-slate-900 w-16">${c.amount}</span>
+                                                    <span className="font-bold text-slate-900 w-16">${Number(c.amount).toFixed(2)}</span>
                                                     <span className="flex-1 text-slate-500 text-xs truncate">Referral: {c.referralId?.referredUserId?.email || c.referralId?.referredEmail || "N/A"}</span>
                                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${statusBadge(c.status)}`}>{c.status}</span>
                                                     {c.status === "pending" && (
@@ -439,7 +439,7 @@ export default function AdminAffiliates() {
                                                     {a.commissionType === 'fixed' ? `$${a.commissionValue}` : `${a.commissionValue}%`}
                                                 </td>
                                                 <td className="px-5 py-4 text-sm text-slate-700">{a.referralCount ?? 0}</td>
-                                                <td className="px-5 py-4 text-sm font-bold text-slate-900">${a.totalEarnings ?? 0}</td>
+                                                <td className="px-5 py-4 text-sm font-bold text-slate-900">${Number(a.totalEarnings ?? 0).toFixed(2)}</td>
                                                 <td className="px-5 py-4">
                                                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold capitalize ${statusBadge(a.status)}`}>{a.status}</span>
                                                 </td>
@@ -476,7 +476,7 @@ export default function AdminAffiliates() {
                                     {payouts.map(p => (
                                         <tr key={p._id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-5 py-4 text-sm font-semibold text-slate-900">{p.affiliateId?.name}</td>
-                                            <td className="px-5 py-4 text-sm font-bold text-slate-900">${p.amount}</td>
+                                            <td className="px-5 py-4 text-sm font-bold text-slate-900">${Number(p.amount).toFixed(2)}</td>
                                             <td className="px-5 py-4 text-sm capitalize text-slate-600">{p.method}</td>
                                             <td className="px-5 py-4 text-sm text-slate-500">{new Date(p.createdAt).toLocaleDateString()}</td>
                                             <td className="px-5 py-4">

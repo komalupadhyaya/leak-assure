@@ -28,7 +28,7 @@ exports.getMe = async (req, res) => {
                     let amount = affiliate.commissionValue || 20;
                     if (affiliate.commissionType === 'percentage') {
                         const planPrice = ref.referredUserId.planPrice || (ref.referredUserId.plan === 'premium' ? 49 : 29);
-                        amount = (planPrice * amount) / 100;
+                        amount = Math.round(((planPrice * amount) / 100) * 100) / 100;
                     }
 
                     const newComm = new Commission({
@@ -44,9 +44,9 @@ exports.getMe = async (req, res) => {
             }
         }
 
-        const totalEarnings = commissions.reduce((sum, c) => sum + c.amount, 0);
-        const paidEarnings = commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
-        const availableBalance = commissions.filter(c => c.status === 'approved').reduce((sum, c) => sum + c.amount, 0);
+        const totalEarnings = Math.round(commissions.reduce((sum, c) => sum + c.amount, 0) * 100) / 100;
+        const paidEarnings = Math.round(commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0) * 100) / 100;
+        const availableBalance = Math.round(commissions.filter(c => c.status === 'approved').reduce((sum, c) => sum + c.amount, 0) * 100) / 100;
         const totalReferrals = await Referral.countDocuments({ affiliateId: affiliate._id });
 
         return res.json({

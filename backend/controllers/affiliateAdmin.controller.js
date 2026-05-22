@@ -80,8 +80,8 @@ exports.getAllAffiliates = async (req, res) => {
         // Attach commission totals
         const enriched = await Promise.all(affiliates.map(async (a) => {
             const commissions = await Commission.find({ affiliateId: a._id });
-            const totalEarnings = commissions.reduce((s, c) => s + c.amount, 0);
-            const paidEarnings = commissions.filter(c => c.status === 'paid').reduce((s, c) => s + c.amount, 0);
+            const totalEarnings = Math.round(commissions.reduce((s, c) => s + c.amount, 0) * 100) / 100;
+            const paidEarnings = Math.round(commissions.filter(c => c.status === 'paid').reduce((s, c) => s + c.amount, 0) * 100) / 100;
             const referralCount = await Referral.countDocuments({ affiliateId: a._id });
             return { ...a.toObject(), totalEarnings, paidEarnings, referralCount };
         }));

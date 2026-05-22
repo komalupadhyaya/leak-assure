@@ -29,9 +29,9 @@ export default function AffiliateCommissions() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
-                        { label: "Total", value: `$${total}` },
-                        { label: "Approved", value: `$${commissions.filter(c => c.status === "approved").reduce((s, c) => s + c.amount, 0)}` },
-                        { label: "Paid Out", value: `$${paid}` },
+                        { label: "Total", value: `$${total.toFixed(2)}` },
+                        { label: "Approved", value: `$${commissions.filter(c => c.status === "approved").reduce((s, c) => s + c.amount, 0).toFixed(2)}` },
+                        { label: "Paid Out", value: `$${paid.toFixed(2)}` },
                     ].map(({ label, value }) => (
                         <div key={label} className="bg-white rounded-xl border border-slate-200 p-4">
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</p>
@@ -62,7 +62,7 @@ export default function AffiliateCommissions() {
                                     {commissions.map((c, i) => (
                                         <tr key={i} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-5 py-4 text-sm text-slate-600">{new Date(c.createdAt).toLocaleDateString()}</td>
-                                            <td className="px-5 py-4 text-sm font-bold text-slate-900">${c.amount}</td>
+                                            <td className="px-5 py-4 text-sm font-bold text-slate-900">${c.amount.toFixed(2)}</td>
                                             <td className="px-5 py-4">
                                                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold capitalize ${statusBadge(c.status)}`}>{c.status}</span>
                                             </td>

@@ -62,9 +62,9 @@ export default function AffiliateDashboard() {
                 {/* Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                        { label: "Total Earnings", value: `$${data?.earnings?.totalEarnings ?? 0}`, icon: DollarSign, color: "text-blue-600 bg-blue-50" },
-                        { label: "Available Balance", value: `$${data?.earnings?.availableBalance ?? 0}`, icon: TrendingUp, color: "text-green-600 bg-green-50" },
-                        { label: "Paid Out", value: `$${data?.earnings?.paidEarnings ?? 0}`, icon: CheckCircle, color: "text-purple-600 bg-purple-50" },
+                        { label: "Total Earnings", value: `$${Number(data?.earnings?.totalEarnings ?? 0).toFixed(2)}`, icon: DollarSign, color: "text-blue-600 bg-blue-50" },
+                        { label: "Available Balance", value: `$${Number(data?.earnings?.availableBalance ?? 0).toFixed(2)}`, icon: TrendingUp, color: "text-green-600 bg-green-50" },
+                        { label: "Paid Out", value: `$${Number(data?.earnings?.paidEarnings ?? 0).toFixed(2)}`, icon: CheckCircle, color: "text-purple-600 bg-purple-50" },
                         { label: "Total Referrals", value: data?.earnings?.totalReferrals ?? 0, icon: Users, color: "text-amber-600 bg-amber-50" },
                     ].map(({ label, value, icon: Icon, color }) => (
                         <div key={label} className="bg-white rounded-xl border border-slate-200 p-5">

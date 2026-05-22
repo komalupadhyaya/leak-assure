@@ -102,7 +102,7 @@ const getOrCreateUserFromSession = async (session) => {
                 if (affiliate.commissionType === 'fixed') {
                     commissionAmount = affiliate.commissionValue;
                 } else {
-                    commissionAmount = (paidAmount * affiliate.commissionValue) / 100;
+                    commissionAmount = Math.round(((paidAmount * affiliate.commissionValue) / 100) * 100) / 100;
                 }
 
                 const commission = new Commission({
@@ -303,7 +303,7 @@ exports.handleWebhook = async (req, res) => {
                         if (affiliate.commissionType === 'fixed') {
                             commissionAmount = affiliate.commissionValue;
                         } else {
-                            commissionAmount = (paidAmount * affiliate.commissionValue) / 100;
+                            commissionAmount = Math.round(((paidAmount * affiliate.commissionValue) / 100) * 100) / 100;
                         }
 
                         const commission = new Commission({
