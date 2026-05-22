@@ -39,17 +39,21 @@ const validateAddress = async (address) => {
         const result = data.result;
         const verdict = result.verdict;
 
-        // Check if address is valid and specifically in the US
-        // We look for high confidence and no major omissions
-        const isValid = !verdict.hasUnconfirmedComponents && 
-                        !verdict.hasIncompleteComponents &&
-                        !verdict.hasInferredComponents &&
-                        result.address.postalAddress.regionCode === 'US';
+        // Extract the region code
+        const regionCode = result.address.postalAddress.regionCode;
+
+        // An address is valid if it is in the US and Google has successfully validated it to
+        // at least a Route or Premise/Subpremise level (not just city/state/zip level)
+        const granularity = verdict.validationGranularity;
+        const isUS = regionCode === 'US';
+        const isDetailedEnough = ['PREMISE', 'SUB_PREMISE', 'ROUTE', 'PREMISE_SUITE_OR_APARTMENT'].includes(granularity);
+
+        const isValid = isUS && isDetailedEnough;
 
         if (!isValid) {
             return {
                 isValid: false,
-                error: 'Could not verify a valid U.S. address. Please check your input.'
+                error: 'Could not verify a valid, complete U.S. street address. Please check your input.'
             };
         }
 

@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const emailService = require('../services/email.service');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_key';
 
@@ -18,6 +19,8 @@ exports.register = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         let user;
+        let isNewSignup = false;
+
         if (existingUser) {
             // Update existing record (e.g. from Stripe checkout)
             existingUser.password = hashedPassword;
@@ -34,7 +37,23 @@ exports.register = async (req, res) => {
                 subscriptionStatus: 'pending'
             });
             await user.save();
+            isNewSignup = true;
         }
+
+        // Send Welcome Email for new signups
+        try {
+            await emailService.sendSignupConfirmation(user.email, user.fullName);
+        } catch (emailErr) {
+            console.error('Failed to send welcome email during registration:', emailErr.message);
+        }
+
+        // Notify Admin of new registration
+        try {
+            await emailService.sendNewMemberAdminNotification(user);
+        } catch (adminErr) {
+            console.error('Failed to send admin notification during registration:', adminErr.message);
+        }
+
 
         // Generate token with role
         const token = jwt.sign({ id: user._id, email: user.email, role: user.role || 'member' }, JWT_SECRET, { expiresIn: '7d' });

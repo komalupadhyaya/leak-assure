@@ -6,6 +6,10 @@ const ctrl = require('../controllers/affiliateAdmin.controller');
 // All routes require admin auth
 router.use(adminAuth);
 
+// Global Commission Settings
+router.get('/global-commission', ctrl.getGlobalCommissionSettings);
+router.patch('/global-commission', ctrl.updateGlobalCommissionSettings);
+
 // Affiliates
 router.get('/', ctrl.getAllAffiliates);
 router.get('/:id', ctrl.getAffiliateDetail);

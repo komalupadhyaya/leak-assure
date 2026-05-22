@@ -3,7 +3,63 @@ const Referral = require('../models/Referral');
 const Commission = require('../models/Commission');
 const Payout = require('../models/Payout');
 const Creative = require('../models/Creative');
+const SystemSettings = require('../models/SystemSettings');
 const emailService = require('../services/email.service');
+
+// GET /api/affiliates-admin/global-commission
+exports.getGlobalCommissionSettings = async (req, res) => {
+    try {
+        let settings = await SystemSettings.findOne({ key: 'globalAffiliateCommission' });
+        if (!settings) {
+            // Return defaults if not set in DB yet
+            return res.json({
+                commissionType: 'percentage',
+                commissionValue: 20
+            });
+        }
+        return res.json(settings.value);
+    } catch (err) {
+        console.error('[AffiliateAdmin.getGlobalCommissionSettings]', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// PATCH /api/affiliates-admin/global-commission
+exports.updateGlobalCommissionSettings = async (req, res) => {
+    try {
+        const { commissionType, commissionValue, applyToAll } = req.body;
+        if (!['fixed', 'percentage'].includes(commissionType)) {
+            return res.status(400).json({ error: 'Invalid commission type' });
+        }
+        if (typeof commissionValue !== 'number' || commissionValue < 0) {
+            return res.status(400).json({ error: 'Invalid commission value' });
+        }
+
+        let settings = await SystemSettings.findOne({ key: 'globalAffiliateCommission' });
+        if (!settings) {
+            settings = new SystemSettings({
+                key: 'globalAffiliateCommission',
+                value: { commissionType, commissionValue }
+            });
+        } else {
+            settings.value = { commissionType, commissionValue };
+            settings.markModified('value');
+        }
+        await settings.save();
+
+        if (applyToAll === true) {
+            await Affiliate.updateMany({}, { commissionType, commissionValue });
+        }
+
+        return res.json({
+            message: 'Global commission settings updated successfully',
+            settings: settings.value
+        });
+    } catch (err) {
+        console.error('[AffiliateAdmin.updateGlobalCommissionSettings]', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
 
 // GET /api/admin/affiliates
 exports.getAllAffiliates = async (req, res) => {

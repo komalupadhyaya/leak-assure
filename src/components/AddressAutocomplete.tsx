@@ -65,6 +65,7 @@ export function AddressAutocomplete({
     const containerRef = useRef<HTMLDivElement>(null);
     const autocompleteServiceRef = useRef<any>(null);
     const geocoderRef = useRef<any>(null);
+    const placesServiceRef = useRef<any>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Sync query with external value
@@ -80,6 +81,7 @@ export function AddressAutocomplete({
             const g = (window as any).google;
             autocompleteServiceRef.current = new g.maps.places.AutocompleteService();
             geocoderRef.current = new g.maps.Geocoder();
+            placesServiceRef.current = new g.maps.places.PlacesService(document.createElement("div"));
             setGoogleReady(true);
         }).catch((e: unknown) => console.error("Google Maps failed to load", e));
     }, []);
@@ -137,33 +139,70 @@ export function AddressAutocomplete({
         setIsOpen(false);
         setSuggestions([]);
 
+        let placeResult: any = null;
+
+        // 1. Try Geocoder first
         if (geocoderRef.current) {
             try {
                 // Ensure we handle the promise rejection if API is disabled
                 const result = await new Promise<any>((resolve, reject) => {
                     geocoderRef.current.geocode({ placeId: suggestion.place_id }, (results: any, status: string) => {
-                        if (status === "OK") resolve({ results });
+                        if (status === "OK") resolve(results);
                         else reject(new Error(status));
                     });
                 });
-
-                if (result.results?.[0]) {
-                    const res = result.results[0];
-                    const loc = res.geometry.location;
-                    const components = {
-                        street: `${getComponent(res, "street_number")} ${getComponent(res, "route")}`.trim(),
-                        city: getComponent(res, "locality"),
-                        state: getComponent(res, "administrative_area_level_1", true),
-                        zip: getComponent(res, "postal_code"),
-                        country: getComponent(res, "country", true),
-                        lat: loc.lat(),
-                        lng: loc.lng(),
-                    };
-                    onSelect(suggestion.description, components);
-                    return;
+                if (result?.[0]) {
+                    placeResult = result[0];
                 }
             } catch (err) {
-                console.warn("Geocoding failed, falling back to description only:", err);
+                console.warn("Geocoding failed, trying PlacesService fallback:", err);
+            }
+        }
+
+        // 2. Try PlacesService if Geocoder failed (e.g. REQUEST_DENIED due to API restriction)
+        if (!placeResult && placesServiceRef.current) {
+            try {
+                const result = await new Promise<any>((resolve, reject) => {
+                    placesServiceRef.current.getDetails(
+                        {
+                            placeId: suggestion.place_id,
+                            fields: ["address_components", "geometry"],
+                        },
+                        (place: any, status: string) => {
+                            const g = (window as any).google;
+                            if (status === g.maps.places.PlacesServiceStatus.OK && place) {
+                                resolve(place);
+                            } else {
+                                reject(new Error(status));
+                            }
+                        }
+                    );
+                });
+                if (result) {
+                    placeResult = result;
+                }
+            } catch (err) {
+                console.warn("PlacesService fallback also failed:", err);
+            }
+        }
+
+        // 3. Process results if we successfully retrieved details via either method
+        if (placeResult) {
+            try {
+                const loc = placeResult.geometry.location;
+                const components = {
+                    street: `${getComponent(placeResult, "street_number")} ${getComponent(placeResult, "route")}`.trim(),
+                    city: getComponent(placeResult, "locality"),
+                    state: getComponent(placeResult, "administrative_area_level_1", true),
+                    zip: getComponent(placeResult, "postal_code"),
+                    country: getComponent(placeResult, "country", true),
+                    lat: typeof loc.lat === "function" ? loc.lat() : loc.lat,
+                    lng: typeof loc.lng === "function" ? loc.lng() : loc.lng,
+                };
+                onSelect(suggestion.description, components);
+                return;
+            } catch (err) {
+                console.error("Failed to parse address components:", err);
             }
         }
         

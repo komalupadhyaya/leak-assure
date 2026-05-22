@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const Affiliate = require('../models/Affiliate');
+const SystemSettings = require('../models/SystemSettings');
 const emailService = require('../services/email.service');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_key';
@@ -29,7 +30,29 @@ exports.affiliateSignup = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const affiliate = new Affiliate({ name, email, password: hashedPassword, paypalEmail, zelleInfo });
+
+        // Fetch global commission settings to initialize new affiliate
+        let commissionType = 'percentage';
+        let commissionValue = 20;
+        try {
+            const settings = await SystemSettings.findOne({ key: 'globalAffiliateCommission' });
+            if (settings && settings.value) {
+                commissionType = settings.value.commissionType;
+                commissionValue = settings.value.commissionValue;
+            }
+        } catch (settingsErr) {
+            console.error('[AffiliateSignup] Failed to fetch global settings, falling back to defaults:', settingsErr.message);
+        }
+
+        const affiliate = new Affiliate({ 
+            name, 
+            email, 
+            password: hashedPassword, 
+            paypalEmail, 
+            zelleInfo,
+            commissionType,
+            commissionValue
+        });
         await affiliate.save();
 
         // Generate and save the personalized referral slug separately (safe, outside save hook)

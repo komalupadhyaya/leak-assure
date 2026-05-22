@@ -46,8 +46,7 @@ export default function AffiliateSignup() {
                         <p className="text-sm text-slate-500">Affiliate Program</p>
                     </div>
                 </div>
-                <h1 className="text-2xl font-bold text-slate-900 mb-1">Apply as Affiliate</h1>
-                <p className="text-sm text-slate-500 mb-6">Earn ${import.meta.env.VITE_AFFILIATE_COMMISSION_AMOUNT || '20'} per referral that converts to a paid plan.</p>
+                <h1 className="text-2xl font-bold text-slate-900 mb-4">Apply as Affiliate</h1>             
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input type="text" placeholder="Full Name" required value={form.name}
                         onChange={e => setForm({ ...form, name: e.target.value })}

@@ -14,6 +14,114 @@ const jwt = require('jsonwebtoken');
 const Affiliate = require('../models/Affiliate');
 const Payment = require('../models/Payment');
 
+// Helper function to safely find or create user upon successful payment
+const getOrCreateUserFromSession = async (session) => {
+    // 1. Try to find the user in DB
+    let user = await User.findOne({
+        $or: [
+            { stripeSessionId: session.id },
+            { stripeCustomerId: session.customer },
+            { email: session.metadata?.email }
+        ]
+    });
+
+    if (user) {
+        return { user, isNew: false };
+    }
+
+    // 2. Verify metadata contains the required fields
+    const meta = session.metadata;
+    if (!meta || !meta.email || !meta.passwordHash) {
+        console.warn("[getOrCreateUserFromSession] Metadata is missing email/password for session:", session.id);
+        return { user: null, isNew: false };
+    }
+
+    console.log("[getOrCreateUserFromSession] Creating user from session metadata:", meta.email);
+
+    // 3. Resolve planPrice
+    let planPrice = 0;
+    if (session.amount_total) {
+        planPrice = session.amount_total / 100;
+    } else {
+        planPrice = meta.plan === 'premium' ? 49 : 29;
+    }
+
+    // 4. Create User record with active status
+    const createdAt = new Date();
+    const waitingPeriodEnd = new Date(createdAt);
+    waitingPeriodEnd.setDate(waitingPeriodEnd.getDate() + 30);
+
+    user = new User({
+        firstName: meta.firstName || '',
+        lastName: meta.lastName || '',
+        fullName: meta.fullName || '',
+        email: meta.email,
+        phone: meta.phone || '',
+        serviceAddress: meta.serviceAddress || '',
+        addressStreet: meta.addressStreet || '',
+        addressCity: meta.addressCity || '',
+        addressState: meta.addressState || '',
+        addressZip: meta.addressZip || '',
+        addressCountry: meta.addressCountry || 'US',
+        plan: meta.plan || 'essential',
+        smsOptIn: meta.smsOptIn === 'true',
+        password: meta.passwordHash,
+        role: 'member',
+        forcePasswordChange: false,
+        stripeCustomerId: session.customer,
+        stripeSessionId: session.id,
+        stripeSubscriptionId: session.subscription,
+        subscriptionStatus: 'active',
+        planPrice,
+        activatedAt: new Date(),
+        lastPaymentDate: new Date(),
+        waitingPeriodEnd,
+        createdAt
+    });
+
+    await user.save();
+    console.log("[getOrCreateUserFromSession] Successfully created and saved User:", user._id);
+
+    // 5. Handle Referral and Affiliate logic if refCode exists
+    if (meta.refCode) {
+        try {
+            const affiliate = await Affiliate.findOne({ referralCode: meta.refCode, status: 'approved' });
+            if (affiliate) {
+                const referral = new Referral({
+                    affiliateId: affiliate._id,
+                    referredUserId: user._id,
+                    referredEmail: user.email,
+                    convertedAt: new Date(),
+                });
+                await referral.save();
+                console.log(`[getOrCreateUserFromSession Referral] Created and converted referral for affiliate: ${affiliate.email}`);
+
+                // Generate commission
+                let commissionAmount = 0;
+                const paidAmount = planPrice;
+                if (affiliate.commissionType === 'fixed') {
+                    commissionAmount = affiliate.commissionValue;
+                } else {
+                    commissionAmount = (paidAmount * affiliate.commissionValue) / 100;
+                }
+
+                const commission = new Commission({
+                    affiliateId: affiliate._id,
+                    referralId: referral._id,
+                    amount: commissionAmount,
+                    status: 'pending',
+                });
+                await commission.save();
+                console.log(`[getOrCreateUserFromSession Commission] Created pending commission: $${commissionAmount}`);
+            }
+        } catch (refErr) {
+            console.error('[getOrCreateUserFromSession Referral Error]:', refErr.message);
+        }
+    }
+
+    return { user, isNew: true };
+};
+
 exports.handleWebhook = async (req, res) => {
 
     console.log("\n================ STRIPE WEBHOOK RECEIVED ================");
@@ -48,54 +156,17 @@ exports.handleWebhook = async (req, res) => {
         console.log("Metadata Email:", session.metadata?.email);
 
         try {
-            // Enhanced lookup: try Session ID first, then Customer ID, then Email
-            const user = await User.findOne({
-                $or: [
-                    { stripeSessionId: session.id },
-                    { stripeCustomerId: session.customer },
-                    { email: session.metadata?.email }
-                ]
-            });
-
-            console.log("User Lookup Result:", user ? `FOUND (${user.email}, ID: ${user._id})` : "NOT FOUND");
+            // Find or create User from Stripe Session
+            const { user, isNew } = await getOrCreateUserFromSession(session);
 
             if (!user) {
-                console.warn("CRITICAL: No user matched this Stripe session. Database might be out of sync.");
+                console.warn("CRITICAL: Failed to locate or create user for this Stripe session.");
                 return res.json({ received: true });
             }
 
-            let sendCredentials = false;
-            let tempPassword = '';
-
-            if (user.subscriptionStatus !== 'active') {
-                console.log("[Webhook] Updating user status to active...");
-                
-                let planPrice = 0;
-                if (session.amount_total) {
-                    planPrice = session.amount_total / 100;
-                } else {
-                    planPrice = user.plan === 'premium' ? 49 : 29;
-                }
-
-                user.stripeSubscriptionId = session.subscription;
-                user.subscriptionStatus = 'active';
-                user.activatedAt = new Date();
-                user.lastPaymentDate = new Date();
-                user.planPrice = planPrice;
-
-                if (!user.password) {
-                    console.log(`[Stripe Webhook] Generating temporary credentials for new user: ${user.email}`);
-                    tempPassword = crypto.randomBytes(4).toString('hex');
-                    const hashedPassword = await bcrypt.hash(tempPassword, 10);
-                    user.password = hashedPassword;
-                    user.forcePasswordChange = true;
-                    sendCredentials = true;
-                }
-
-                await user.save();
-                console.log("[Webhook] User record updated successfully. Current status:", user.subscriptionStatus);
-
-                // RECORD INITIAL PAYMENT
+            // RECORD INITIAL PAYMENT (Ensure idempotency)
+            const existingPayment = await Payment.findOne({ stripeInvoiceId: session.invoice });
+            if (!existingPayment && session.invoice) {
                 try {
                     await Payment.create({
                         memberId: user._id,
@@ -110,44 +181,6 @@ exports.handleWebhook = async (req, res) => {
                 } catch (payErr) {
                     console.error("[Webhook Payment Recording Error]:", payErr.message);
                 }
-            } else {
-                console.log("[Webhook] User already active. Processing remaining triggers (email, referrals)...");
-            }
-
-            // --- AFFILIATE CONVERSION & COMMISSION ---
-            try {
-                const referral = await Referral.findOne({ referredUserId: user._id, convertedAt: null });
-                if (referral) {
-                    console.log("[Webhook] Found referral to convert.");
-                    referral.convertedAt = new Date();
-                    await referral.save();
-
-                    const affiliate = await Affiliate.findById(referral.affiliateId);
-                    let commissionAmount = 0;
-
-                    if (affiliate) {
-                        const paidAmount = session.amount_total / 100;
-                        if (affiliate.commissionType === 'fixed') {
-                            commissionAmount = affiliate.commissionValue;
-                        } else {
-                            commissionAmount = (paidAmount * affiliate.commissionValue) / 100;
-                        }
-                    } else {
-                        // Fallback to env if affiliate not found for some reason
-                        commissionAmount = parseInt(process.env.AFFILIATE_COMMISSION_AMOUNT || '20', 10);
-                    }
-
-                    const commission = new Commission({
-                        affiliateId: referral.affiliateId,
-                        referralId: referral._id,
-                        amount: commissionAmount,
-                        status: 'pending',
-                    });
-                    await commission.save();
-                    console.log(`[Webhook] Referral record updated and commission created: $${commissionAmount}`);
-                }
-            } catch (refErr) {
-                console.error('[Webhook Referral Error]:', refErr.message);
             }
 
             // --- SEND ENROLLMENT CONFIRMATION EMAIL & SMS ---
@@ -176,19 +209,8 @@ exports.handleWebhook = async (req, res) => {
                 console.log("[Webhook] confirmationEmailSent is already true. Skipping.");
             }
 
-            // --- SEND CREDENTIALS IF NEEDED ---
-            if (sendCredentials) {
-                console.log("[Webhook] Sending login credentials email...");
-                try {
-                    await emailService.sendLoginCredentials(user.email, user.fullName, tempPassword);
-                } catch (credError) {
-                    console.error("[Webhook Credentials Email Error]:", credError.message);
-                }
-            }
-
         } catch (error) {
-            console.error("FATAL ERROR during checkout.session.completed processing:", error);
-            return res.status(500).json({ error: 'Internal server error' });
+            console.error("Error processing checkout session:", error);
         }
 
     } else if (event.type === 'invoice.payment_failed') {
@@ -232,64 +254,74 @@ exports.handleWebhook = async (req, res) => {
         }
 
     } else if (event.type === 'invoice.payment_succeeded') {
+
         const invoice = event.data.object;
-        
-        // Skip initial payment if it was already handled by checkout.session.completed
-        // (Checkout session usually handles the first payment of a subscription)
+
+        console.log("\n--- PROCESSING INVOICE PAYMENT SUCCEEDED ---");
+        console.log("Invoice ID:", invoice.id);
+        console.log("Customer ID:", invoice.customer);
+        console.log("Billing Reason:", invoice.billing_reason);
+
+        // Skip commission generation if it's the initial subscription creation payment
         if (invoice.billing_reason === 'subscription_create') {
             console.log("[Webhook] Skipping recurring commission for initial subscription invoice.");
             return res.json({ received: true });
         }
 
-        console.log("\n--- RECURRING PAYMENT SUCCEEDED ---");
-        console.log("Invoice ID:", invoice.id);
-        console.log("Customer ID:", invoice.customer);
-
         try {
+            // Find corresponding user
             const user = await User.findOne({ stripeCustomerId: invoice.customer });
-            if (!user) {
-                console.warn("[Webhook] User not found for recurring payment:", invoice.customer);
-                return res.json({ received: true });
-            }
 
-            const referral = await Referral.findOne({ referredUserId: user._id });
-            if (referral) {
-                const affiliate = await Affiliate.findById(referral.affiliateId);
-                let commissionAmount = 0;
+            if (user) {
+                console.log("Found user for invoice:", user.email);
 
-                if (affiliate) {
-                    const paidAmount = invoice.amount_paid / 100;
-                    if (affiliate.commissionType === 'fixed') {
-                        commissionAmount = affiliate.commissionValue;
-                    } else {
-                        commissionAmount = (paidAmount * affiliate.commissionValue) / 100;
+                user.subscriptionStatus = 'active';
+                user.lastPaymentDate = new Date();
+                await user.save();
+
+                // RECORD SUCCESSFUL RECURRING PAYMENT
+                await Payment.create({
+                    memberId: user._id,
+                    stripeInvoiceId: invoice.id,
+                    stripePaymentIntentId: invoice.payment_intent,
+                    amount: invoice.amount_paid / 100,
+                    status: 'succeeded',
+                    planType: user.plan,
+                    billingReason: invoice.billing_reason
+                });
+                console.log("Recurring payment logged.");
+
+                // --- PROCESS RECURRING COMMISSION ---
+                // Find converted referral to attribute recurring commission
+                const referral = await Referral.findOne({ referredUserId: user._id, convertedAt: { $ne: null } });
+                if (referral) {
+                    const affiliate = await Affiliate.findById(referral.affiliateId);
+                    let commissionAmount = 0;
+
+                    if (affiliate) {
+                        const paidAmount = invoice.amount_paid / 100;
+                        if (affiliate.commissionType === 'fixed') {
+                            commissionAmount = affiliate.commissionValue;
+                        } else {
+                            commissionAmount = (paidAmount * affiliate.commissionValue) / 100;
+                        }
+
+                        const commission = new Commission({
+                            affiliateId: referral.affiliateId,
+                            referralId: referral._id,
+                            amount: commissionAmount,
+                            status: 'pending',
+                        });
+                        await commission.save();
+                        console.log(`Recurring commission of $${commissionAmount} credited to affiliate.`);
                     }
-
-                    const commission = new Commission({
-                        affiliateId: affiliate._id,
-                        referralId: referral._id,
-                        amount: commissionAmount,
-                        status: 'pending',
-                        metadata: { invoiceId: invoice.id }
-                    });
-                    await commission.save();
-                    console.log(`[Webhook] Recurring commission created: $${commissionAmount} for affiliate: ${affiliate.email}`);
                 }
+            } else {
+                console.warn("No user found matching stripeCustomerId:", invoice.customer);
             }
-
-            // RECORD SUCCESSFUL RECURRING PAYMENT
-            await Payment.create({
-                memberId: user._id,
-                stripeInvoiceId: invoice.id,
-                stripePaymentIntentId: invoice.payment_intent,
-                amount: invoice.amount_paid / 100,
-                status: 'succeeded',
-                planType: user.plan,
-                billingReason: invoice.billing_reason
-            });
-            console.log("[Webhook] Recurring payment recorded in DB.");
         } catch (error) {
-            console.error("[Webhook] Error processing recurring commission:", error.message);
+            console.error("Error processing invoice.payment_succeeded event");
+            console.error(error);
         }
 
     } else if (event.type === 'customer.subscription.deleted') {
@@ -339,32 +371,28 @@ exports.getSessionDetails = async (req, res) => {
             return res.status(404).json({ error: 'Session not found' });
         }
 
-        const user = await User.findOne({ stripeCustomerId: session.customer });
+        // Retrieve or create User on the fly using Stripe Checkout details
+        const { user, isNew } = await getOrCreateUserFromSession(session);
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'User not found and metadata is missing' });
         }
 
         const token = jwt.sign({ id: user._id, email: user.email, role: user.role || 'member' }, process.env.JWT_SECRET || 'your_fallback_secret_key', { expiresIn: '7d' });
 
         // Set cookie for cross-subdomain auto-login
-        res.cookie('token', token, {
+        const isProduction = process.env.NODE_ENV === 'production' || !!process.env.COOKIE_DOMAIN;
+        const cookieOptions = {
             httpOnly: false, // Set to false so frontend can read it for cross-subdomain auto-login
-            secure: true,
-            sameSite: 'none',
-            domain: process.env.COOKIE_DOMAIN || '.leakassure.com',
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        });
-
-        // --- FALLBACK TRIGGER: Activate account if webhook missed it ---
-        if (user.subscriptionStatus === 'pending') {
-            console.log(`[Fallback] Activating account for: ${user.email}`);
-            user.subscriptionStatus = 'active';
-            user.activatedAt = new Date();
-            user.stripeSubscriptionId = session.subscription;
-            user.planPrice = session.amount_total ? session.amount_total / 100 : (user.plan === 'premium' ? 49 : 29);
-            await user.save();
+        };
+        // Only set domain on production — setting domain on localhost breaks cookies in all browsers
+        if (process.env.COOKIE_DOMAIN) {
+            cookieOptions.domain = process.env.COOKIE_DOMAIN;
         }
+        res.cookie('token', token, cookieOptions);
 
         // --- FALLBACK TRIGGER: Send enrollment email if webhook missed it ---
         if (!user.confirmationEmailSent) {

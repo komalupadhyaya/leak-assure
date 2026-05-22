@@ -217,3 +217,22 @@ export const adminDeleteCreative = async (id: string) => {
     if (!res.ok) throw new Error(json.error || 'Failed');
     return json;
 };
+
+export const adminGetGlobalCommission = async () => {
+    const res = await fetch(`${API_URL}/api/affiliates-admin/global-commission`, { credentials: 'include' });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Failed to fetch global commission settings');
+    return json;
+};
+
+export const adminUpdateGlobalCommission = async (data: { commissionType: string; commissionValue: number; applyToAll: boolean }) => {
+    const res = await fetch(`${API_URL}/api/affiliates-admin/global-commission`, {
+        method: 'PATCH',
+        headers: credHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Failed to update global commission settings');
+    return json;
+};

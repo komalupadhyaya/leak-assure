@@ -1,48 +1,74 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const templates = require('../templates/emailTemplates');
 
-let resend;
-if (process.env.RESEND_API_KEY) {
-    resend = new Resend(process.env.RESEND_API_KEY);
+// Helper to strip any enclosing single/double quotes and whitespace from env variables
+const cleanEnvVar = (val) => {
+    if (!val) return '';
+    let trimmed = val.trim();
+    if ((trimmed.startsWith("'") && trimmed.endsWith("'")) || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+        trimmed = trimmed.slice(1, -1);
+    }
+    return trimmed.trim();
+};
+
+const clientId     = cleanEnvVar(process.env.GOOGLE_CLIENT_ID     || process.env.Google_Client_id);
+const clientSecret = cleanEnvVar(process.env.GOOGLE_CLIENT_SECRET  || process.env.Google_Client_Secreate);
+const refreshToken = cleanEnvVar(process.env.GOOGLE_REFRESH_TOKEN  || process.env.Google_Refresh_Token || process.env['Google-Refresh_Token']);
+const googleEmail  = cleanEnvVar(process.env.GOOGLE_EMAIL          || process.env.Google_Email);
+
+let transporter = null;
+
+if (clientId && clientSecret && refreshToken && googleEmail) {
+    transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            type: 'OAuth2',
+            user: googleEmail,
+            clientId: clientId,
+            clientSecret: clientSecret,
+            refreshToken: refreshToken
+        }
+    });
+    console.log('[Email Service]: Gmail OAuth2 transporter initialized for', googleEmail);
+} else {
+    console.error('[Email Service]: CRITICAL — Gmail OAuth2 credentials are missing or incomplete.');
+    console.error('  Missing:', [
+        !clientId     && 'GOOGLE_CLIENT_ID',
+        !clientSecret && 'GOOGLE_CLIENT_SECRET',
+        !refreshToken && 'GOOGLE_REFRESH_TOKEN',
+        !googleEmail  && 'GOOGLE_EMAIL'
+    ].filter(Boolean).join(', '));
 }
-const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 
 /**
- * Core Resend Email Sender Helper
+ * Core Gmail OAuth2 Email Sender
  */
 const sendEmail = async ({ to, subject, html, text }) => {
+    if (!transporter) {
+        console.error('[Email Service]: Transporter not initialized — email NOT sent to:', to);
+        return null;
+    }
+
     try {
-        if (!process.env.RESEND_API_KEY) {
-            console.error("CRITICAL: RESEND_API_KEY is missing from environment variables.");
-            return null;
-        }
-
-        if (!resend) {
-            resend = new Resend(process.env.RESEND_API_KEY);
-        }
-
-        const result = await resend.emails.send({
-            from: `Leak Assure <${EMAIL_FROM}>`,
+        const result = await transporter.sendMail({
+            from: `Leak Assure <${googleEmail}>`,
             to,
             subject,
             text: text || '',
-            html: html
+            html
         });
-
-        if (result.error) {
-            console.error('[Resend Error]:', result.error);
-            throw new Error(result.error.message);
-        }
-
-        console.log('[Email Sent via Resend]:', result.data.id);
-        return result.data;
+        console.log('[Email Sent via Gmail OAuth2]:', result.messageId, '→', to);
+        return { id: result.messageId };
     } catch (error) {
-        console.error('[Email Service Exception]:', error.message);
+        console.error('[Email Service]: Send failed to:', to);
+        console.error('[Email Service]: Error code:', error.code);
+        console.error('[Email Service]: Error message:', error.message);
         return null;
     }
 };
 
 exports.sendEmail = sendEmail;
+
 
 exports.sendSignupConfirmation = async (email, name) => {
     const template = templates.welcomeEmail(name);
@@ -153,12 +179,20 @@ exports.sendEnrollmentConfirmationEmail = async (user) => {
     const planName = user.plan === 'premium' ? 'Premium Protection Plan' : 'Essential Protection Plan';
     const template = templates.welcomeEmail(user.fullName, planName, user.serviceAddress);
     
-    return await sendEmail({
+    const userEmailResult = await sendEmail({
         to: user.email,
         subject: template.subject,
         html: template.html,
         text: `Welcome to Leak Assure! Your ${planName} has been activated.`
     });
+
+    try {
+        await exports.sendNewMemberAdminNotification(user);
+    } catch (adminErr) {
+        console.error('Failed to send new member admin notification:', adminErr.message);
+    }
+
+    return userEmailResult;
 };
 
 exports.sendAffiliateWelcomeEmail = async (affiliate) => {
@@ -188,3 +222,16 @@ exports.sendNewAffiliateAdminNotification = async (affiliate) => {
         text: `New affiliate signup: ${affiliate.name} (${affiliate.email})`
     });
 };
+
+exports.sendNewMemberAdminNotification = async (user) => {
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@leakassure.com';
+    const template = templates.adminMemberNotification(user);
+    
+    return await sendEmail({
+        to: adminEmail,
+        subject: template.subject,
+        html: template.html,
+        text: `New member joined: ${user.fullName} (${user.email}), Plan: ${user.plan}, Address: ${user.serviceAddress}`
+    });
+};
+

@@ -104,6 +104,47 @@ exports.adminAffiliateNotification = (affiliate) => ({
     `, "New Affiliate Registration")
 });
 
+exports.adminMemberNotification = (user) => ({
+    subject: `New Member Joined: ${user.fullName}`,
+    html: premiumWrapper(`
+        <p style="margin-top: 0;">A new member has completed their registration and joined Leak Assure.</p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; margin: 24px 0; border-radius: 12px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td style="padding-bottom: 12px; color: #64748b; font-size: 14px;">Member Name</td>
+                    <td style="padding-bottom: 12px; font-weight: 700; text-align: right;">${user.fullName}</td>
+                </tr>
+                <tr>
+                    <td style="padding-bottom: 12px; color: #64748b; font-size: 14px;">Email Address</td>
+                    <td style="padding-bottom: 12px; font-weight: 700; text-align: right;">${user.email}</td>
+                </tr>
+                <tr>
+                    <td style="padding-bottom: 12px; color: #64748b; font-size: 14px;">Phone Number</td>
+                    <td style="padding-bottom: 12px; font-weight: 700; text-align: right;">${user.phone || 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding-bottom: 12px; color: #64748b; font-size: 14px;">Service Address</td>
+                    <td style="padding-bottom: 12px; font-weight: 700; text-align: right;">${user.serviceAddress || 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding-bottom: 12px; color: #64748b; font-size: 14px;">Selected Plan</td>
+                    <td style="padding-bottom: 12px; font-weight: 700; text-align: right; text-transform: capitalize;">${user.plan || 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="color: #64748b; font-size: 14px;">Signup Date</td>
+                    <td style="font-weight: 700; text-align: right;">${new Date().toLocaleDateString()}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div style="text-align: center; margin-top: 32px;">
+            <a href="${process.env.FRONTEND_ADMIN_URL || 'https://admin.leakassure.com'}/admin/members" style="background-color: #1e293b; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">View Member Details</a>
+        </div>
+    `, "New Member Registration")
+});
+
+
 exports.affiliateStatusEmail = (name, status) => {
     const isApproved = status === 'approved';
     const statusText = isApproved ? 'Approved!' : 'Rejected';

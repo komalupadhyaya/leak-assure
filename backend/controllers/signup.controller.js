@@ -87,63 +87,13 @@ exports.startSignup = async (req, res) => {
             console.log('Created new Stripe customer:', stripeCustomerId);
         }
 
-        // 4. Save preliminary user record BEFORE checkout
-        console.log("Creating checkout session for:", email);
-
-        const createdAt = new Date();
-        const waitingPeriodEnd = new Date(createdAt);
-        waitingPeriodEnd.setDate(waitingPeriodEnd.getDate() + 30);
-
+        // 4. Hash the password BEFORE checkout so we can store it in metadata securely
         const hashedPassword = await bcrypt.hash(password, 10);
+        const refCode = req.body.ref || (req.cookies && req.cookies.la_ref) || '';
 
-        const user = new User({
-            firstName,
-            lastName,
-            fullName,
-            email,
-            phone,
-            serviceAddress: validation.formattedAddress || serviceAddress,
-            addressStreet: validation.components?.street,
-            addressCity: validation.components?.city,
-            addressState: validation.components?.state,
-            addressZip: validation.components?.zip,
-            addressCountry: validation.components?.country || 'US',
-            plan,
-            smsOptIn,
-            password: hashedPassword,
-            role: 'member', // Force role to member
-            forcePasswordChange: false,
-            stripeCustomerId,
-            subscriptionStatus: 'pending',
-            waitingPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            createdAt,
-        });
+        console.log("Creating Stripe checkout session for:", email);
 
-        await user.save();
-        console.log('User record saved with pending status:', user._id);
-
-        // --- REFERRAL TRACKING ---
-        const refCode = req.body.ref || (req.cookies && req.cookies.la_ref);
-        console.log(`[Signup Controller] Processing referral code: ${refCode || 'None'}`);
-        if (refCode) {
-            try {
-                const affiliate = await Affiliate.findOne({ referralCode: refCode, status: 'approved' });
-                if (affiliate) {
-                    const referral = new Referral({
-                        affiliateId: affiliate._id,
-                        referredUserId: user._id,
-                        referredEmail: user.email,
-                        convertedAt: null, // To be set on successful payment
-                    });
-                    await referral.save();
-                    console.log(`[Referral] Created pending referral for affiliate: ${affiliate.email}`);
-                }
-            } catch (refErr) {
-                console.error('[Referral] Failed to create referral record:', refErr.message);
-            }
-        }
-
-        // 5. Create Stripe Checkout Session
+        // 5. Create Stripe Checkout Session with all user details in metadata
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
             payment_method_types: ['card'],
@@ -157,17 +107,25 @@ exports.startSignup = async (req, res) => {
             success_url: `${process.env.FRONTEND_SIGNUP_URL || 'https://signup.leakassure.com'}/welcome?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${process.env.FRONTEND_SIGNUP_URL || 'https://signup.leakassure.com'}/`,
             metadata: {
-                email: email,
-                plan: plan,
-                userId: user._id.toString()
+                firstName,
+                lastName,
+                fullName,
+                email,
+                phone,
+                serviceAddress: validation.formattedAddress || serviceAddress,
+                addressStreet: validation.components?.street || '',
+                addressCity: validation.components?.city || '',
+                addressState: validation.components?.state || '',
+                addressZip: validation.components?.zip || '',
+                addressCountry: validation.components?.country || 'US',
+                plan,
+                smsOptIn: smsOptIn ? 'true' : 'false',
+                passwordHash: hashedPassword,
+                refCode: refCode
             }
         });
 
         console.log('Stripe checkout session created:', session.id);
-
-        // Update user with session ID for tracking
-        user.stripeSessionId = session.id;
-        await user.save();
 
         // 6. Return checkout URL
         return res.status(200).json({ url: session.url });
