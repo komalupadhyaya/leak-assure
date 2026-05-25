@@ -17,13 +17,16 @@ exports.createClaim = async (req, res) => {
             targetId: claim._id
         });
 
-        // Notify member
+        // Fire-and-forget: don't block the claim response waiting for email
         const User = require('../models/User');
-        const user = await User.findById(claim.memberId);
-        if (user) {
-            const emailService = require('../services/email.service');
-            await emailService.sendClaimConfirmation(user.email, user.fullName, claim.issueType);
-        }
+        const emailService = require('../services/email.service');
+        User.findById(claim.memberId).then(user => {
+            if (user) {
+                emailService.sendClaimConfirmation(user.email, user.fullName, claim.issueType).catch(err =>
+                    console.error('[Claim] Confirmation email failed (non-critical):', err.message)
+                );
+            }
+        }).catch(() => {});
 
         res.status(201).json(claim);
     } catch (error) {
@@ -88,15 +91,18 @@ exports.updateClaimStatus = async (req, res) => {
             metadata: { status }
         });
 
-        // Notify member
+        // Fire-and-forget: notify member in background, don't block admin response
         const User = require('../models/User');
-        const user = await User.findById(claim.memberId);
-        if (user) {
-            const emailService = require('../services/email.service');
-            const smsService = require('../services/sms.service');
-            await emailService.sendClaimStatusUpdate(user.email, user.fullName, status);
-            smsService.sendClaimStatusUpdateSMS(user.phone, status);
-        }
+        const emailService = require('../services/email.service');
+        const smsService = require('../services/sms.service');
+        User.findById(claim.memberId).then(user => {
+            if (user) {
+                emailService.sendClaimStatusUpdate(user.email, user.fullName, status).catch(err =>
+                    console.error('[ClaimStatus] Email failed (non-critical):', err.message)
+                );
+                smsService.sendClaimStatusUpdateSMS(user.phone, status);
+            }
+        }).catch(() => {});
 
         res.json(claim);
     } catch (error) {

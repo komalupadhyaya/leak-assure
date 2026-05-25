@@ -204,8 +204,10 @@ exports.updateCommissionStatus = async (req, res) => {
             });
             await payout.save();
 
-            // NOTIFY AFFILIATE
-            await emailService.sendPayoutConfirmation(affiliate.email, affiliate.name, commission.amount, req.body.method);
+            // Fire-and-forget: don't block the response waiting for the email
+            emailService.sendPayoutConfirmation(affiliate.email, affiliate.name, commission.amount, req.body.method).catch(err =>
+                console.error('[Payout] Confirmation email failed (non-critical):', err.message)
+            );
         }
 
         return res.json(commission);

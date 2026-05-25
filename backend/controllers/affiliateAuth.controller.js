@@ -44,6 +44,14 @@ exports.affiliateSignup = async (req, res) => {
             console.error('[AffiliateSignup] Failed to fetch global settings, falling back to defaults:', settingsErr.message);
         }
 
+        // Generate slug BEFORE saving so we only need one DB write
+        let referralSlug = null;
+        try {
+            referralSlug = await Affiliate.generateUniqueSlug(name);
+        } catch (slugErr) {
+            console.error('[AffiliateSignup] Slug generation error (non-critical):', slugErr.message);
+        }
+
         const affiliate = new Affiliate({ 
             name, 
             email, 
@@ -51,29 +59,19 @@ exports.affiliateSignup = async (req, res) => {
             paypalEmail, 
             zelleInfo,
             commissionType,
-            commissionValue
+            commissionValue,
+            ...(referralSlug && { referralSlug })
         });
         await affiliate.save();
 
-        // Generate and save the personalized referral slug separately (safe, outside save hook)
-        try {
-            const slug = await Affiliate.generateUniqueSlug(name);
-            if (slug) {
-                affiliate.referralSlug = slug;
-                await affiliate.save();
-            }
-        } catch (slugErr) {
-            // Non-critical: slug generation failure should not block signup
-            console.error('[AffiliateSignup] Slug generation error (non-critical):', slugErr.message);
-        }
-
-        // Send notifications
-        try {
-            await emailService.sendAffiliateWelcomeEmail(affiliate);
-            await emailService.sendNewAffiliateAdminNotification(affiliate);
-        } catch (emailErr) {
-            console.error('[AffiliateSignup] Email Error:', emailErr.message);
-        }
+        // ✅ Fire-and-forget: do NOT await emails — respond to user immediately.
+        // Emails run in background and any failure is logged but doesn't block the response.
+        emailService.sendAffiliateWelcomeEmail(affiliate).catch(err =>
+            console.error('[AffiliateSignup] Welcome email failed (non-critical):', err.message)
+        );
+        emailService.sendNewAffiliateAdminNotification(affiliate).catch(err =>
+            console.error('[AffiliateSignup] Admin notification email failed (non-critical):', err.message)
+        );
 
         return res.status(201).json({
             message: 'Account created. Your application is pending admin approval.',

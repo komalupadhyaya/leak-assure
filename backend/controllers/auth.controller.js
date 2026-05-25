@@ -40,19 +40,13 @@ exports.register = async (req, res) => {
             isNewSignup = true;
         }
 
-        // Send Welcome Email for new signups
-        try {
-            await emailService.sendSignupConfirmation(user.email, user.fullName);
-        } catch (emailErr) {
-            console.error('Failed to send welcome email during registration:', emailErr.message);
-        }
-
-        // Notify Admin of new registration
-        try {
-            await emailService.sendNewMemberAdminNotification(user);
-        } catch (adminErr) {
-            console.error('Failed to send admin notification during registration:', adminErr.message);
-        }
+        // Fire-and-forget: emails run in background, don't block the response
+        emailService.sendSignupConfirmation(user.email, user.fullName).catch(err =>
+            console.error('Failed to send welcome email during registration:', err.message)
+        );
+        emailService.sendNewMemberAdminNotification(user).catch(err =>
+            console.error('Failed to send admin notification during registration:', err.message)
+        );
 
 
         // Generate token with role

@@ -94,9 +94,10 @@ exports.memberFileClaim = async (req, res) => {
         await claim.save();
 
 
-        // Send confirmation email
-        const emailService = require('../services/email.service');
-        await emailService.sendClaimConfirmation(user.email, user.fullName, claim.leakType, claim._id);
+        // Fire-and-forget: don't block claim response waiting for email
+        emailService.sendClaimConfirmation(user.email, user.fullName, claim.leakType, claim._id).catch(err =>
+            console.error('[Claim] Confirmation email failed (non-critical):', err.message)
+        );
 
         res.status(201).json({
             success: true,
@@ -189,12 +190,13 @@ exports.createMember = async (req, res) => {
 
         await member.save();
 
-        // Send Welcome & Credentials Email
-        await emailService.sendLoginCredentials(email, member.fullName, tempPassword);
-        await emailService.sendEnrollmentConfirmationEmail(member);
-        
-        member.confirmationEmailSent = true;
-        await member.save();
+        // Fire-and-forget: emails send in background, don't block the admin response
+        emailService.sendLoginCredentials(email, member.fullName, tempPassword).catch(err =>
+            console.error('[CreateMember] Login credentials email failed (non-critical):', err.message)
+        );
+        emailService.sendEnrollmentConfirmationEmail(member).catch(err =>
+            console.error('[CreateMember] Enrollment confirmation email failed (non-critical):', err.message)
+        );
 
         res.status(201).json(member);
     } catch (error) {
@@ -342,8 +344,10 @@ exports.cancelSubscription = async (req, res) => {
             metadata: { method: 'Admin' }
         });
 
-        const emailService = require('../services/email.service');
-        await emailService.sendCancellationNotice(member.email, member.fullName);
+        // Fire-and-forget: don't block the cancellation response waiting for email
+        emailService.sendCancellationNotice(member.email, member.fullName).catch(err =>
+            console.error('[CancelSubscription] Cancellation email failed (non-critical):', err.message)
+        );
 
         res.json({ message: 'Subscription canceled successfully', member });
     } catch (error) {
