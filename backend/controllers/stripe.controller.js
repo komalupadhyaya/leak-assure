@@ -397,16 +397,16 @@ exports.getSessionDetails = async (req, res) => {
         // --- FALLBACK TRIGGER: Send enrollment email if webhook missed it ---
         if (!user.confirmationEmailSent) {
             console.log(`[Fallback] Triggering enrollment confirmation for: ${user.email}`);
-            try {
-                const emailResult = await emailService.sendEnrollmentConfirmationEmail(user);
-                if (emailResult) {
-                    user.confirmationEmailSent = true;
-                    await user.save();
-                    console.log("[Fallback] Confirmation email sent successfully.");
-                }
-            } catch (notifyError) {
-                console.error("[Fallback Notification Error]:", notifyError.message);
-            }
+            emailService.sendEnrollmentConfirmationEmail(user)
+                .then(async (emailResult) => {
+                    if (emailResult) {
+                        await User.findByIdAndUpdate(user._id, { confirmationEmailSent: true });
+                        console.log("[Fallback] Confirmation email sent successfully.");
+                    }
+                })
+                .catch(notifyError => {
+                    console.error("[Fallback Notification Error]:", notifyError.message);
+                });
         }
 
         res.json({

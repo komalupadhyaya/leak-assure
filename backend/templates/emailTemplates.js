@@ -186,3 +186,62 @@ exports.payoutEmail = (name, amount, method) => ({
         </div>
     `, "Commission Paid")
 });
+
+exports.claimConfirmationEmail = (name, claimId, issueType) => ({
+    subject: `Claim Received: #${claimId.toString().slice(-6).toUpperCase()} - ${issueType}`,
+    html: premiumWrapper(`
+        <p style="margin-top: 0;">Hi <strong>${name}</strong>,</p>
+        <p>We have successfully registered your claim for <strong>${issueType}</strong>.</p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; margin: 32px 0; border-radius: 12px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td style="padding-bottom: 12px; color: #64748b; font-size: 14px;">Claim ID</td>
+                    <td style="padding-bottom: 12px; font-weight: 700; text-align: right;">#${claimId}</td>
+                </tr>
+                <tr>
+                    <td style="padding-bottom: 12px; color: #64748b; font-size: 14px;">Issue Type</td>
+                    <td style="padding-bottom: 12px; font-weight: 700; text-align: right;">${issueType}</td>
+                </tr>
+                <tr>
+                    <td style="color: #64748b; font-size: 14px;">Status</td>
+                    <td style="font-weight: 700; color: #f59e0b; text-align: right;">Pending Review</td>
+                </tr>
+            </table>
+        </div>
+
+        <p>Our claims team is currently reviewing your submission. We will notify you immediately once the status of your claim is updated.</p>
+    `, "Claim Registered")
+});
+
+exports.loginCredentialsEmail = (name, email, tempPassword) => {
+    const loginUrl = `${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}/login`;
+    return {
+        subject: 'Welcome to Leak Assure: Your Account is Ready',
+        html: premiumWrapper(`
+            <p style="margin-top: 0;">Hi <strong>${name}</strong>,</p>
+            <p>Your Leak Assure account has been successfully created. You can now log in using your temporary credentials below:</p>
+            
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; margin: 32px 0; border-radius: 12px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding-bottom: 12px; color: #64748b; font-size: 14px;">Email Address</td>
+                        <td style="padding-bottom: 12px; font-weight: 700; text-align: right;">${email}</td>
+                    </tr>
+                    <tr>
+                        <td style="color: #64748b; font-size: 14px;">Temporary Password</td>
+                        <td style="font-weight: 700; color: #2563eb; font-family: monospace; font-size: 16px; text-align: right;">${tempPassword}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <p style="font-size: 14px; color: #64748b; margin-top: 16px;">
+                <em>Note: For security reasons, we recommend changing your password after logging in for the first time.</em>
+            </p>
+
+            <div style="text-align: center; margin-top: 40px;">
+                <a href="${loginUrl}" style="background-color: #2563eb; color: #ffffff; padding: 18px 36px; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Access Member Portal</a>
+            </div>
+        `, "Account Created")
+    };
+};

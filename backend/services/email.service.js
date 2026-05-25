@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
 const templates = require('../templates/emailTemplates');
 
 // Helper to strip any enclosing single/double quotes and whitespace from env variables
@@ -16,20 +16,24 @@ const clientSecret = cleanEnvVar(process.env.GOOGLE_CLIENT_SECRET  || process.en
 const refreshToken = cleanEnvVar(process.env.GOOGLE_REFRESH_TOKEN  || process.env.Google_Refresh_Token || process.env['Google-Refresh_Token']);
 const googleEmail  = cleanEnvVar(process.env.GOOGLE_EMAIL          || process.env.Google_Email);
 
-let transporter = null;
+let gmailClient = null;
 
 if (clientId && clientSecret && refreshToken && googleEmail) {
-    transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            type: 'OAuth2',
-            user: googleEmail,
-            clientId: clientId,
-            clientSecret: clientSecret,
-            refreshToken: refreshToken
-        }
-    });
-    console.log('[Email Service]: Gmail OAuth2 transporter initialized for', googleEmail);
+    try {
+        const oauth2Client = new google.auth.OAuth2(
+            clientId,
+            clientSecret
+        );
+
+        oauth2Client.setCredentials({
+            refresh_token: refreshToken
+        });
+
+        gmailClient = google.gmail({ version: 'v1', auth: oauth2Client });
+        console.log('[Email Service]: Gmail REST API client initialized for', googleEmail);
+    } catch (initErr) {
+        console.error('[Email Service]: Failed to initialize Gmail REST API client:', initErr.message);
+    }
 } else {
     console.error('[Email Service]: CRITICAL — Gmail OAuth2 credentials are missing or incomplete.');
     console.error('  Missing:', [
@@ -41,28 +45,53 @@ if (clientId && clientSecret && refreshToken && googleEmail) {
 }
 
 /**
- * Core Gmail OAuth2 Email Sender
+ * Helper to construct the base64url encoded RFC 822 formatted email message
+ */
+const makeBody = (to, from, subject, htmlBody) => {
+    const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+    const messageParts = [
+        `From: Leak Assure <${from}>`,
+        `To: ${to}`,
+        'Content-Type: text/html; charset=utf-8',
+        'MIME-Version: 1.0',
+        `Subject: ${utf8Subject}`,
+        '',
+        htmlBody
+    ];
+    const message = messageParts.join('\r\n');
+
+    // The Gmail API requires base64url encoding (replace + with -, / with _, and remove trailing =)
+    return Buffer.from(message)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+};
+
+/**
+ * Core Gmail REST API Email Sender
  */
 const sendEmail = async ({ to, subject, html, text }) => {
-    if (!transporter) {
-        console.error('[Email Service]: Transporter not initialized — email NOT sent to:', to);
+    if (!gmailClient) {
+        console.error('[Email Service]: Gmail REST API client not initialized — email NOT sent to:', to);
         return null;
     }
 
     try {
-        const result = await transporter.sendMail({
-            from: `Leak Assure <${googleEmail}>`,
-            to,
-            subject,
-            text: text || '',
-            html
+        const raw = makeBody(to, googleEmail, subject, html);
+        
+        const result = await gmailClient.users.messages.send({
+            userId: 'me',
+            requestBody: {
+                raw: raw
+            }
         });
-        console.log('[Email Sent via Gmail OAuth2]:', result.messageId, '→', to);
-        return { id: result.messageId };
+
+        console.log('[Email Sent via Gmail REST API]:', result.data.id, '→', to);
+        return { id: result.data.id };
     } catch (error) {
         console.error('[Email Service]: Send failed to:', to);
-        console.error('[Email Service]: Error code:', error.code);
-        console.error('[Email Service]: Error message:', error.message);
+        console.error('[Email Service]: Error details:', error.response?.data || error.message);
         return null;
     }
 };
@@ -81,26 +110,11 @@ exports.sendSignupConfirmation = async (email, name) => {
 };
 
 exports.sendClaimConfirmation = async (email, name, issueType, claimId) => {
-    const subject = `Claim Received: #${claimId.toString().slice(-6).toUpperCase()} - ${issueType}`;
-    
-    const html = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; background-color: #f8fafc; padding: 40px 20px;">
-            <div style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                <div style="background-color: #2563eb; padding: 40px; text-align: center;">
-                    <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800;">Claim Registered</h1>
-                    <p style="color: #bfdbfe; margin-top: 8px; font-size: 16px;">Claim ID: #${claimId}</p>
-                </div>
-                <div style="padding: 40px;">
-                    <p>Hi ${name}, we have received your claim for <strong>${issueType}</strong>.</p>
-                </div>
-            </div>
-        </div>
-    `;
-
+    const template = templates.claimConfirmationEmail(name, claimId, issueType);
     return await sendEmail({
         to: email,
-        subject,
-        html,
+        subject: template.subject,
+        html: template.html,
         text: `Hi ${name}, we received your claim #${claimId} for ${issueType}.`
     });
 };
@@ -157,21 +171,12 @@ exports.sendPayoutConfirmation = async (email, name, amount, method) => {
 };
 
 exports.sendLoginCredentials = async (email, name, tempPassword) => {
-    const loginUrl = `${process.env.FRONTEND_MEMBER_URL || 'https://member.leakassure.com'}/login`;
-    const subject = 'Your Leak Assure Account is Ready';
-    const html = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-            <h2>Welcome to Leak Assure!</h2>
-            <p>Hi ${name}, your temporary credentials are:</p>
-            <p><strong>Email:</strong> ${email}<br><strong>Password:</strong> ${tempPassword}</p>
-            <a href="${loginUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Login Now</a>
-        </div>
-    `;
+    const template = templates.loginCredentialsEmail(name, email, tempPassword);
     return await sendEmail({
         to: email,
-        subject,
-        html,
-        text: `Login at ${loginUrl} with password ${tempPassword}`
+        subject: template.subject,
+        html: template.html,
+        text: `Hi ${name}, welcome to Leak Assure! Your temporary password is: ${tempPassword}`
     });
 };
 
